@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:timy_attend/screens/auth/register_screen.dart';
 import 'package:timy_attend/screens/dashboard/dashboard_screen.dart';
+import 'package:timy_attend/services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -10,9 +11,9 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  final AuthService authService = AuthService();
   // Controller untuk mengambil isi email.
   final TextEditingController emailController = TextEditingController();
-
   // Controller untuk mengambil isi password.
   final TextEditingController passwordController = TextEditingController();
 
@@ -28,6 +29,33 @@ class _LoginScreenState extends State<LoginScreen> {
     passwordController.dispose();
 
     super.dispose();
+  }
+
+  Future<void> _login() async {
+    final email = emailController.text.trim();
+    final password = passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Email dan password wajib diisi.')),
+      );
+      return;
+    }
+
+    final success = await authService.login(email, password);
+
+    if (!mounted) return;
+
+    if (success) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const DashboardScreen()),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Email atau password salah.')),
+      );
+    }
   }
 
   @override
@@ -169,14 +197,7 @@ class _LoginScreenState extends State<LoginScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const DashboardScreen(),
-                      ),
-                    );
-                  },
+                  onPressed: _login,
                   child: const Text('Login'),
                 ),
               ),
@@ -192,7 +213,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Text(
                     "Don't have an account? ",
                     style: TextStyle(color: Color(0xFF6B7280)),
-                  ), 
+                  ),
 
                   TextButton(
                     onPressed: () {

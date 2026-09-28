@@ -1,29 +1,28 @@
-import 'api_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'api_services.dart';
 
 class AuthService {
-  // Menggunakan ApiService
-  final ApiService apiService;
+  final ApiService apiService = ApiService();
 
-  AuthService(this.apiService);
+  Future<bool> login(String email, String password) async {
+    try {
+      final response = await apiService.dio.post(
+        '/login',
+        data: {
+          'email': email,
+          'password': password,
+        },
+      );
 
-  // Method login akan kita isi setelah
-  // endpoint backend sudah tersedia.
-  Future<void> login({
-    required String email,
-    required String password,
-  }) async {
-    // TODO:
-    // Hubungkan ke endpoint login backend.
-  }
+      final token = response.data['data']['token'];
 
-  // Method register juga akan dihubungkan
-  // setelah API backend tersedia.
-  Future<void> register({
-    required String name,
-    required String email,
-    required String password,
-  }) async {
-    // TODO:
-    // Hubungkan ke endpoint register backend.
+      final prefs = await SharedPreferences.getInstance();
+
+      await prefs.setString('token', token);
+
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 }

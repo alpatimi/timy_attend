@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:timy_attend/screens/auth/login_screen.dart';
 
 import 'edit_profile_screen.dart';
-import '../profile/profile_screen.dart'; //Pastikan path ini sesuai dengan file login Anda
+import '../profile/profile_screen.dart';
+import '../../services/profile_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -12,39 +13,67 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // ============================================================
-  // DATA USER SEMENTARA
-  // ============================================================
-  String userName = 'Timi';
-  String userEmail = 'timi@example.com';
+  final ProfileService profileService = ProfileService();
+  String userName = '';
+  String userEmail = '';
   String userRole = 'Student';
-  String userId = 'TIMY-2026-001';
+  String userId = '';
   String userBatch = 'Batch 4 - Android Developer';
 
+  bool isLoading = true;
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 30),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              buildHeader(),
-              const SizedBox(height: 24),
-              buildProfileCard(),
-              const SizedBox(height: 22),
-              buildAccountSection(),
-              const SizedBox(height: 20),
-              buildApplicationSection(),
-              const SizedBox(height: 25),
-              buildLogoutButton(),
-            ],
-          ),
-        ),
-      ),
-    );
+  void initState() {
+    super.initState();
+    loadProfile();
   }
+
+  Future<void> loadProfile() async {
+    final profile = await profileService.getProfile();
+
+    if (!mounted) return;
+
+    if (profile != null) {
+      setState(() {
+        userName = profile['name'] ?? '';
+        userEmail = profile['email'] ?? '';
+        userId = profile['id']?.toString() ?? '';
+        isLoading = false;
+      });
+    } else {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+ @override
+Widget build(BuildContext context) {
+  return Scaffold(
+    body: isLoading
+        ? const Center(
+            child: CircularProgressIndicator(),
+          )
+        : SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 30),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  buildHeader(),
+                  const SizedBox(height: 24),
+                  buildProfileCard(),
+                  const SizedBox(height: 22),
+                  buildAccountSection(),
+                  const SizedBox(height: 20),
+                  buildApplicationSection(),
+                  const SizedBox(height: 25),
+                  buildLogoutButton(),
+                ],
+              ),
+            ),
+          ),
+  );
+}
 
   // ============================================================
   // HEADER
@@ -81,10 +110,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               SizedBox(height: 3),
               Text(
                 'Manage your account information',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF6B7280),
-                ),
+                style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
               ),
             ],
           ),
@@ -138,10 +164,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 4),
           Text(
             userEmail,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Color(0xFF6B7280),
-            ),
+            style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
           ),
           const SizedBox(height: 8),
           Container(
@@ -299,11 +322,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               color: const Color(0xFFF1F5FF),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(
-              icon,
-              size: 19,
-              color: const Color(0xFF1557D6),
-            ),
+            child: Icon(icon, size: 19, color: const Color(0xFF1557D6)),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -357,11 +376,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 color: const Color(0xFFF1F5FF),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(
-                icon,
-                size: 19,
-                color: const Color(0xFF1557D6),
-              ),
+              child: Icon(icon, size: 19, color: const Color(0xFF1557D6)),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -387,10 +402,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: Color(0xFF9CA3AF),
-            ),
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFF9CA3AF)),
           ],
         ),
       ),
@@ -403,10 +415,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget buildDivider() {
     return const Padding(
       padding: EdgeInsets.only(left: 65),
-      child: Divider(
-        height: 1,
-        color: Color(0xFFE5E7EB),
-      ),
+      child: Divider(height: 1, color: Color(0xFFE5E7EB)),
     );
   }
 
@@ -419,10 +428,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       height: 48,
       child: OutlinedButton.icon(
         onPressed: showLogoutDialog,
-        icon: const Icon(
-          Icons.logout_rounded,
-          color: Color(0xFFDC2626),
-        ),
+        icon: const Icon(Icons.logout_rounded, color: Color(0xFFDC2626)),
         label: const Text(
           'Sign Out',
           style: TextStyle(
@@ -431,9 +437,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
         style: OutlinedButton.styleFrom(
-          side: const BorderSide(
-            color: Color(0xFFFECACA),
-          ),
+          side: const BorderSide(color: Color(0xFFFECACA)),
         ),
       ),
     );
@@ -445,17 +449,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> openEditProfile() async {
     final Map<String, String>? updatedData =
         await Navigator.push<Map<String, String>>(
-      context,
-      MaterialPageRoute(
-        builder: (context) {
-          return EditProfileScreen(
-            currentName: userName,
-            currentEmail: userEmail,
-            currentRole: userRole,
-          );
-        },
-      ),
-    );
+          context,
+          MaterialPageRoute(
+            builder: (context) {
+              return EditProfileScreen(
+                currentName: userName,
+                currentEmail: userEmail,
+                currentRole: userRole,
+              );
+            },
+          ),
+        );
 
     if (updatedData != null) {
       setState(() {
@@ -472,9 +476,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void logout() {
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(
-        builder: (context) => const LoginScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
       (route) => false,
     );
   }

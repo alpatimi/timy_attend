@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../services/profile_service.dart';
+
 class EditProfileScreen extends StatefulWidget {
   // Data user saat ini.
   final String currentName;
@@ -16,12 +18,12 @@ class EditProfileScreen extends StatefulWidget {
   });
 
   @override
-  State<EditProfileScreen> createState() =>
-      _EditProfileScreenState();
+  State<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
-class _EditProfileScreenState
-    extends State<EditProfileScreen> {
+class _EditProfileScreenState extends State<EditProfileScreen> {
+  final ProfileService profileService = ProfileService();
+  bool isLoading = false;
   // Controller untuk nama.
   late TextEditingController nameController;
 
@@ -36,13 +38,9 @@ class _EditProfileScreenState
     super.initState();
 
     // Mengisi form dengan data user sebelumnya.
-    nameController = TextEditingController(
-      text: widget.currentName,
-    );
+    nameController = TextEditingController(text: widget.currentName);
 
-    emailController = TextEditingController(
-      text: widget.currentEmail,
-    );
+    emailController = TextEditingController(text: widget.currentEmail);
 
     selectedRole = widget.currentRole;
   }
@@ -61,21 +59,11 @@ class _EditProfileScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Edit Profile',
-        ),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Edit Profile'), centerTitle: true),
 
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(
-            20,
-            24,
-            20,
-            30,
-          ),
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 30),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -158,10 +146,7 @@ class _EditProfileScreenState
 
           const Text(
             'Profile Photo',
-            style: TextStyle(
-              fontSize: 11,
-              color: Color(0xFF6B7280),
-            ),
+            style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
           ),
         ],
       ),
@@ -216,36 +201,21 @@ class _EditProfileScreenState
 
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(
-            horizontal: 14,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
             color: const Color(0xFFF6F7FC),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: const Color(0xFFE1E5EF),
-            ),
+            border: Border.all(color: const Color(0xFFE1E5EF)),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: selectedRole,
               isExpanded: true,
-              icon: const Icon(
-                Icons.keyboard_arrow_down_rounded,
-              ),
+              icon: const Icon(Icons.keyboard_arrow_down_rounded),
               items: const [
-                DropdownMenuItem(
-                  value: 'Student',
-                  child: Text('Student'),
-                ),
-                DropdownMenuItem(
-                  value: 'Staff',
-                  child: Text('Staff'),
-                ),
-                DropdownMenuItem(
-                  value: 'Teacher',
-                  child: Text('Teacher'),
-                ),
+                DropdownMenuItem(value: 'Student', child: Text('Student')),
+                DropdownMenuItem(value: 'Staff', child: Text('Staff')),
+                DropdownMenuItem(value: 'Teacher', child: Text('Teacher')),
               ],
               onChanged: (String? value) {
                 if (value == null) {
@@ -293,10 +263,7 @@ class _EditProfileScreenState
           keyboardType: keyboardType,
           decoration: InputDecoration(
             hintText: hint,
-            prefixIcon: Icon(
-              icon,
-              size: 20,
-            ),
+            prefixIcon: Icon(icon, size: 20),
           ),
         ),
       ],
@@ -312,13 +279,18 @@ class _EditProfileScreenState
       width: double.infinity,
       height: 48,
       child: ElevatedButton.icon(
-        onPressed: saveProfile,
-        icon: const Icon(
-          Icons.check_rounded,
-        ),
-        label: const Text(
-          'Save Changes',
-        ),
+        onPressed: isLoading ? null : saveProfile,
+        icon: isLoading
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : const Icon(Icons.check_rounded),
+        label: Text(isLoading ? 'Saving...' : 'Save Changes'),
       ),
     );
   }
@@ -327,49 +299,75 @@ class _EditProfileScreenState
   // SAVE PROFILE
   // ============================================================
 
-  void saveProfile() {
-    // Validasi nama.
-    if (nameController.text.trim().isEmpty) {
-      showError(
-        'Full name cannot be empty.',
-      );
+  Future<void> saveProfile() async {
+    final name = nameController.text.trim();
+    final email = emailController.text.trim();
 
+    // Validasi nama
+    if (name.isEmpty) {
+      showError('Full name cannot be empty.');
       return;
     }
 
-    // Validasi email.
-    if (emailController.text.trim().isEmpty) {
-      showError(
-        'Email address cannot be empty.',
-      );
-
+    // Validasi email kosong & format email
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (email.isEmpty) {
+      showError('Email address cannot be empty.');
+      return;
+    } else if (!emailRegex.hasMatch(email)) {
+      showError('Please enter a valid email address.');
       return;
     }
 
-    // Mengembalikan data ke ProfileScreen.
-    Navigator.pop(
-      context,
-      {
-        'name': nameController.text.trim(),
-        'email': emailController.text.trim(),
+    setState(() {
+      isLoading = true;
+    });
+
+final updatedProfile = await profileService.updateProfile(
+  name: nameController.text.trim(),
+);
+
+    if (!mounted) return;
+
+    setState(() {
+      isLoading = false;
+    });
+
+    if (updatedProfile != null) {
+      // Ambil objek user/data jika dibungkus oleh response backend
+      final userData =
+          updatedProfile['data'] ?? updatedProfile['user'] ?? updatedProfile;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profil berhasil diperbarui!'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+      Navigator.pop(context, {
+        'name': (userData is Map ? userData['name'] : null) ?? name,
+        'email': (userData is Map ? userData['email'] : null) ?? email,
         'role': selectedRole,
-      },
-    );
+      });
+    } else {
+      showError('Gagal memperbarui profil. Periksa koneksi atau input Anda.');
+    }
   }
 
   // ============================================================
   // ERROR MESSAGE
   // ============================================================
-
-  void showError(String message) {
+void showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
+        backgroundColor: Colors.red,
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
-
   // ============================================================
   // PHOTO MESSAGE
   // ============================================================
@@ -377,9 +375,7 @@ class _EditProfileScreenState
   void showPhotoMessage() {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text(
-          'Profile photo upload will be connected later.',
-        ),
+        content: Text('Profile photo upload will be connected later.'),
         behavior: SnackBarBehavior.floating,
       ),
     );
