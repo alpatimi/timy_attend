@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:timy_attend/screens/history/history_screen.dart';
+import 'package:timy_attend/services/attendance_service.dart';
+
 import '../profile/profile_screen.dart';
+import '../../services/attendance_service.dart';
+
+import 'package:geolocator/geolocator.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -10,6 +15,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  final AttendanceService attendanceService = AttendanceService();
   // Menyimpan index menu yang sedang dipilih.
   int selectedIndex = 0;
 
@@ -24,21 +30,70 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Nanti akan berasal dari response API profile/login.
   final String userName = 'Timi';
 
-  // Waktu check-in sementara.
-  //
-  // Nanti akan berasal dari API.
-  final String checkInTime = '08:30 AM';
-
-  // Waktu check-out sementara.
-  //
-  // Nanti akan berasal dari API.
-  final String checkOutTime = '05:00 PM';
+  String? checkInTime;
+  String? checkOutTime;
 
   // Latitude sementara.
   final String latitude = '-6.175392';
 
   // Longitude sementara.
   final String longitude = '106.824964';
+  Future<Position?> getCurrentLocation() async {
+    bool serviceEnabled;
+
+    // Cek apakah GPS/lokasi HP aktif
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+
+    if (!serviceEnabled) {
+      if (!mounted) return null;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Silakan aktifkan lokasi/GPS terlebih dahulu.'),
+        ),
+      );
+
+      return null;
+    }
+
+    // Cek permission lokasi
+    LocationPermission permission = await Geolocator.checkPermission();
+
+    // Kalau belum diberikan, minta permission
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+
+      if (permission == LocationPermission.denied) {
+        if (!mounted) return null;
+
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Izin lokasi ditolak.')));
+
+        return null;
+      }
+    }
+
+    // Kalau ditolak permanen
+    if (permission == LocationPermission.deniedForever) {
+      if (!mounted) return null;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Izin lokasi ditolak permanen. Silakan aktifkan dari Settings.',
+          ),
+        ),
+      );
+
+      return null;
+    }
+
+    // Ambil lokasi GPS
+    return await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -261,7 +316,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Expanded(
                 child: buildTimeItem(
                   title: 'Check-in',
-                  time: isCheckedIn ? checkInTime : '--:--',
+                  time: isCheckedIn ? (checkInTime ?? '--:--') : '--:--',
                   icon: Icons.login_rounded,
                 ),
               ),
@@ -271,7 +326,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Expanded(
                 child: buildTimeItem(
                   title: 'Check-out',
-                  time: isCheckedOut ? checkOutTime : '--:--',
+                  time: isCheckedOut ? (checkOutTime ?? '--:--') : '--:--',
                   icon: Icons.logout_rounded,
                 ),
               ),
@@ -384,9 +439,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget buildAttendanceButton() {
     String buttonText;
-
     IconData buttonIcon;
-
     bool buttonEnabled = true;
 
     if (isCheckedOut) {
@@ -406,14 +459,73 @@ class _DashboardScreenState extends State<DashboardScreen> {
       height: 48,
       child: ElevatedButton.icon(
         onPressed: buttonEnabled
-            ? () {
-                setState(() {
-                  if (!isCheckedIn) {
-                    isCheckedIn = true;
-                  } else {
-                    isCheckedOut = true;
+            ? () async {
+                if (!isCheckedIn) {
+                  print('CHECK IN DITEKAN');
+                  final position = await getCurrentLocation();
+
+                  if (position == null) {
+                    return;
                   }
-                });
+
+                  final success = await attendanceService.checkIn(
+                    latitude: position.latitude.toString(),
+                    longitude: position.longitude.toString(),
+                    address: 'Lokasi GPS',
+                  );
+
+                  if (!mounted) return;
+
+                  if (success) {
+                    final now = DateTime.now();
+
+                    setState(() {
+                      isCheckedIn = true;
+                      checkInTime =
+                          '${now.hour.toString().padLeft(2, '0')}:'
+                          '${now.minute.toString().padLeft(2, '0')}';
+                    });
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Check In berhasil!')),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Check In gagal. Silakan coba lagi.'),
+                      ),
+                    );
+                  }
+                } else {
+                  final success = await attendanceService.checkOut(
+                    latitude: latitude,
+                    longitude: longitude,
+                    address: 'Jakarta',
+                  );
+
+                  if (!mounted) return;
+
+                  if (success) {
+                    final now = DateTime.now();
+
+                    setState(() {
+                      isCheckedOut = true;
+                      checkOutTime =
+                          '${now.hour.toString().padLeft(2, '0')}:'
+                          '${now.minute.toString().padLeft(2, '0')}';
+                    });
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Check Out berhasil!')),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Check Out gagal. Silakan coba lagi.'),
+                      ),
+                    );
+                  }
+                }
               }
             : null,
         icon: Icon(buttonIcon),
@@ -838,9 +950,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // PROFILE PAGE
   // ============================================================
 
-Widget buildProfilePage() {
-  return const ProfileScreen();
-}
+  Widget buildProfilePage() {
+    return const ProfileScreen();
+  }
 
   // ============================================================
   // DATE

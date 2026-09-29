@@ -25,4 +25,32 @@ class AuthService {
       return false;
     }
   }
+
+  Future<bool> register(
+  String name,
+  String email,
+  String password,
+) async {
+  try {
+    final response = await apiService.dio.post(
+      '/register',
+      data: {
+        'name': name,
+        'email': email,
+        'password': password,
+      },
+    );
+
+    final token = response.data['data']['token'];
+
+    final prefs = await SharedPreferences.getInstance();
+
+    await prefs.setString('token', token);
+
+    return true;
+  } catch (e) {
+    print('REGISTER ERROR: $e');
+    return false;
+  }
+}
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:timy_attend/screens/auth/login_screen.dart';
+import 'package:timy_attend/services/auth_service.dart';
 
 class RegistrasiScreen extends StatefulWidget {
   const RegistrasiScreen({super.key});
@@ -9,6 +10,8 @@ class RegistrasiScreen extends StatefulWidget {
 }
 
 class _RegistrasiScreenState extends State<RegistrasiScreen> {
+
+  final AuthService authService = AuthService();
   // Controller untuk mengambil nama pengguna.
   final TextEditingController nameController = TextEditingController();
 
@@ -68,7 +71,7 @@ class _RegistrasiScreenState extends State<RegistrasiScreen> {
   }
 
   // Fungsi untuk memeriksa input sebelum register.
-  void validateForm() {
+  Future<void> validateForm() async {
     // Mengambil nilai input dan menghapus spasi di awal/akhir.
     final String name = nameController.text.trim();
     final String email = emailController.text.trim();
@@ -139,7 +142,26 @@ class _RegistrasiScreenState extends State<RegistrasiScreen> {
     // Untuk sekarang baru menampilkan data.
     //
     // API register akan kita masukkan pada tahap berikutnya.
-    showMessage('Data valid. API register akan kita hubungkan berikutnya.');
+    // Mengirim data register ke API.
+final success = await authService.register(
+  name,
+  email,
+  password,
+);
+
+if (success) {
+  showMessage('Registrasi berhasil.');
+
+  // Kembali ke halaman login.
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const LoginScreen(),
+    ),
+  );
+} else {
+  showMessage('Registrasi gagal. Email mungkin sudah terdaftar.');
+}
   }
 
   // Fungsi untuk menampilkan pesan kepada pengguna.
