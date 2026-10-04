@@ -3,7 +3,6 @@ import 'package:timy_attend/screens/history/history_screen.dart';
 import 'package:timy_attend/services/attendance_service.dart';
 
 import '../profile/profile_screen.dart';
-import '../../services/attendance_service.dart';
 
 import 'package:geolocator/geolocator.dart';
 
@@ -98,6 +97,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FB),
+
       // =========================
       // BODY
       // =========================
@@ -111,32 +112,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // =========================
       // BOTTOM NAVIGATION
       // =========================
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: selectedIndex,
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Color(0xFFE8EDF5))),
+        ),
+        child: NavigationBar(
+          selectedIndex: selectedIndex,
 
-        onDestinationSelected: (int index) {
-          setState(() {
-            selectedIndex = index;
-          });
-        },
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          height: 68,
+          indicatorColor: const Color(0xFFEAF1FF),
 
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.history_outlined),
-            selectedIcon: Icon(Icons.history),
-            label: 'History',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
+          onDestinationSelected: (int index) {
+            setState(() {
+              selectedIndex = index;
+            });
+          },
+
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined, color: Color(0xFF6B7280)),
+              selectedIcon: Icon(Icons.home, color: Color(0xFF1557D6)),
+              label: 'Home',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.history_outlined, color: Color(0xFF6B7280)),
+              selectedIcon: Icon(Icons.history, color: Color(0xFF1557D6)),
+              label: 'History',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline, color: Color(0xFF6B7280)),
+              selectedIcon: Icon(Icons.person, color: Color(0xFF1557D6)),
+              label: 'Profile',
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -147,29 +160,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget buildHomePage() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           buildHeader(),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 28),
 
           buildGreeting(),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 22),
 
           buildAttendanceCard(),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 22),
 
           buildLocationCard(),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 28),
 
           buildMonthlyAttendance(),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 28),
 
           buildRecentRecords(),
         ],
@@ -186,20 +199,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
       children: [
         // Logo kecil aplikasi.
         Container(
-          width: 42,
-          height: 42,
+          width: 46,
+          height: 46,
           decoration: BoxDecoration(
-            color: const Color(0xFFEAF0FF),
-            borderRadius: BorderRadius.circular(12),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF2F6BEA), Color(0xFF1557D6)],
+            ),
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF1557D6).withValues(alpha: 0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 5),
+              ),
+            ],
           ),
           child: const Icon(
             Icons.access_time_rounded,
-            color: Color(0xFF1557D6),
+            color: Colors.white,
             size: 25,
           ),
         ),
 
-        const SizedBox(width: 10),
+        const SizedBox(width: 12),
 
         // Nama aplikasi.
         const Expanded(
@@ -209,33 +233,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Text(
                 'TimyAttend',
                 style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
                   color: Color(0xFF172033),
                 ),
               ),
               Text(
                 'Attendance Portal',
-                style: TextStyle(fontSize: 10, color: Color(0xFF6B7280)),
+                style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
               ),
             ],
           ),
         ),
 
         // Tombol notifikasi.
-        IconButton(
-          onPressed: () {},
-          icon: const Icon(
-            Icons.notifications_none_rounded,
-            color: Color(0xFF172033),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(color: const Color(0xFFE8EDF5)),
+          ),
+          child: IconButton(
+            onPressed: () {},
+            icon: const Icon(
+              Icons.notifications_none_rounded,
+              color: Color(0xFF172033),
+            ),
           ),
         ),
 
+        const SizedBox(width: 8),
+
         // Avatar user.
-        CircleAvatar(
-          radius: 19,
-          backgroundColor: const Color(0xFFEAF0FF),
-          child: const Icon(Icons.person, color: Color(0xFF1557D6)),
+        Container(
+          padding: const EdgeInsets.all(2),
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              colors: [Color(0xFF60A5FA), Color(0xFF1557D6)],
+            ),
+          ),
+          child: const CircleAvatar(
+            radius: 19,
+            backgroundColor: Color(0xFFEAF0FF),
+            child: Icon(Icons.person, color: Color(0xFF1557D6)),
+          ),
         ),
       ],
     );
@@ -252,17 +295,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Text(
           'Good morning, $userName 👋',
           style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.6,
             color: Color(0xFF172033),
           ),
         ),
 
-        const SizedBox(height: 5),
+        const SizedBox(height: 6),
 
-        Text(
-          getCurrentDate(),
-          style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+        Row(
+          children: [
+            const Icon(
+              Icons.calendar_today_outlined,
+              size: 13,
+              color: Color(0xFF6B7280),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              getCurrentDate(),
+              style: const TextStyle(fontSize: 13.5, color: Color(0xFF6B7280)),
+            ),
+          ],
         ),
       ],
     );
@@ -275,15 +329,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget buildAttendanceCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF2F6BEA), Color(0xFF1245B0)],
+        ),
+        borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: const Color(0xFF1557D6).withValues(alpha: 0.35),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
           ),
         ],
       ),
@@ -297,9 +355,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Text(
                   "Today's Attendance",
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF172033),
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -308,29 +367,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
 
-          const SizedBox(height: 18),
+          const SizedBox(height: 20),
 
           // Check-in dan check-out.
-          Row(
-            children: [
-              Expanded(
-                child: buildTimeItem(
-                  title: 'Check-in',
-                  time: isCheckedIn ? (checkInTime ?? '--:--') : '--:--',
-                  icon: Icons.login_rounded,
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: buildTimeItem(
+                    title: 'Check-in',
+                    time: isCheckedIn ? (checkInTime ?? '--:--') : '--:--',
+                    icon: Icons.login_rounded,
+                  ),
                 ),
-              ),
 
-              Container(width: 1, height: 55, color: const Color(0xFFE5E7EB)),
-
-              Expanded(
-                child: buildTimeItem(
-                  title: 'Check-out',
-                  time: isCheckedOut ? (checkOutTime ?? '--:--') : '--:--',
-                  icon: Icons.logout_rounded,
+                Container(
+                  width: 1,
+                  height: 58,
+                  color: Colors.white.withValues(alpha: 0.25),
                 ),
-              ),
-            ],
+
+                Expanded(
+                  child: buildTimeItem(
+                    title: 'Check-out',
+                    time: isCheckedOut ? (checkOutTime ?? '--:--') : '--:--',
+                    icon: Icons.logout_rounded,
+                  ),
+                ),
+              ],
+            ),
           ),
 
           const SizedBox(height: 18),
@@ -368,12 +439,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             width: 7,
@@ -386,8 +458,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Text(
             status,
             style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
               color: textColor,
             ),
           ),
@@ -409,13 +481,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Column(
         children: [
-          Icon(icon, size: 19, color: const Color(0xFF1557D6)),
+          Icon(icon, size: 20, color: Colors.white.withValues(alpha: 0.85)),
 
           const SizedBox(height: 7),
 
           Text(
             title,
-            style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.white.withValues(alpha: 0.75),
+            ),
           ),
 
           const SizedBox(height: 3),
@@ -423,9 +498,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Text(
             time,
             style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF172033),
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+              color: Colors.white,
             ),
           ),
         ],
@@ -456,8 +532,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return SizedBox(
       width: double.infinity,
-      height: 48,
+      height: 54,
       child: ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF1557D6),
+          disabledBackgroundColor: Colors.white.withValues(alpha: 0.25),
+          disabledForegroundColor: Colors.white.withValues(alpha: 0.85),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          textStyle: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2,
+          ),
+        ),
         onPressed: buttonEnabled
             ? () async {
                 if (!isCheckedIn) {
@@ -541,15 +632,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget buildLocationCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE8EDF5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: const Color(0xFF1557D6).withValues(alpha: 0.06),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -562,8 +654,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Text(
                   'Current Location',
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
                     color: Color(0xFF172033),
                   ),
                 ),
@@ -571,100 +664,140 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
               TextButton.icon(
                 onPressed: () {},
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF1557D6),
+                  backgroundColor: const Color(0xFFEAF1FF),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  minimumSize: const Size(0, 34),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
                 icon: const Icon(Icons.refresh, size: 16),
-                label: const Text('Refresh', style: TextStyle(fontSize: 11)),
+                label: const Text(
+                  'Refresh',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
               ),
             ],
           ),
 
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
 
           // =========================
           // MAP PLACEHOLDER
           // =========================
-          Container(
-            height: 160,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAF0F8),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // Background garis sederhana
-                // untuk memberikan kesan map.
-                CustomPaint(
-                  size: const Size(double.infinity, double.infinity),
-                  painter: MapPlaceholderPainter(),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Container(
+              height: 170,
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFFEFF4FC), Color(0xFFDDE8F7)],
                 ),
-
-                // Marker lokasi.
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1557D6),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF1557D6).withValues(alpha: 0.25),
-                        blurRadius: 12,
-                        spreadRadius: 5,
-                      ),
-                    ],
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Background garis sederhana
+                  // untuk memberikan kesan map.
+                  CustomPaint(
+                    size: const Size(double.infinity, double.infinity),
+                    painter: MapPlaceholderPainter(),
                   ),
-                  child: const Icon(
-                    Icons.location_on,
-                    color: Colors.white,
-                    size: 25,
-                  ),
-                ),
 
-                // Label lokasi.
-                Positioned(
-                  bottom: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
+                  // Marker lokasi.
+                  Container(
+                    width: 50,
+                    height: 50,
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
+                      color: const Color(0xFF1557D6),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 3),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(
+                            0xFF1557D6,
+                          ).withValues(alpha: 0.3),
+                          blurRadius: 14,
+                          spreadRadius: 6,
+                        ),
+                      ],
                     ),
-                    child: const Text(
-                      'Your current location',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF172033),
+                    child: const Icon(
+                      Icons.location_on,
+                      color: Colors.white,
+                      size: 25,
+                    ),
+                  ),
+
+                  // Label lokasi.
+                  Positioned(
+                    bottom: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Text(
+                        'Your current location',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF172033),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
           // Koordinat.
           Row(
             children: [
-              const Icon(
-                Icons.location_on_outlined,
-                size: 17,
-                color: Color(0xFF1557D6),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEAF1FF),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.location_on_outlined,
+                  size: 16,
+                  color: Color(0xFF1557D6),
+                ),
               ),
 
-              const SizedBox(width: 6),
+              const SizedBox(width: 10),
 
               Expanded(
                 child: Text(
                   'Lat: $latitude   •   Long: $longitude',
                   style: const TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
                     color: Color(0xFF6B7280),
                   ),
                 ),
@@ -690,25 +823,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Text(
                 'Monthly Attendance',
                 style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.2,
                   color: Color(0xFF172033),
                 ),
               ),
             ),
 
-            Text(
-              getCurrentMonth(),
-              style: const TextStyle(
-                fontSize: 11,
-                color: Color(0xFF1557D6),
-                fontWeight: FontWeight.w600,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEAF1FF),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                getCurrentMonth(),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF1557D6),
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ],
         ),
 
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
 
         Row(
           children: [
@@ -721,7 +862,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
 
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
 
             Expanded(
               child: buildStatisticCard(
@@ -732,7 +873,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
 
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
 
             Expanded(
               child: buildStatisticCard(
@@ -759,27 +900,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required IconData icon,
   }) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE8EDF5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: const Color(0xFF1557D6).withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Column(
         children: [
-          Icon(icon, size: 18, color: const Color(0xFF1557D6)),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEAF1FF),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 18, color: const Color(0xFF1557D6)),
+          ),
 
-          const SizedBox(height: 7),
+          const SizedBox(height: 10),
 
           Text(
             title,
-            style: const TextStyle(fontSize: 9, color: Color(0xFF6B7280)),
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF6B7280),
+            ),
           ),
 
           const SizedBox(height: 2),
@@ -787,15 +940,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Text(
             value,
             style: const TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.bold,
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
               color: Color(0xFF172033),
             ),
           ),
 
           Text(
             subtitle,
-            style: const TextStyle(fontSize: 8, color: Color(0xFF9CA3AF)),
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 10, color: Color(0xFF9CA3AF)),
           ),
         ],
       ),
@@ -837,8 +992,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Text(
                 'Recent Records',
                 style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.2,
                   color: Color(0xFF172033),
                 ),
               ),
@@ -850,23 +1006,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   selectedIndex = 1;
                 });
               },
-              child: const Text('View All', style: TextStyle(fontSize: 11)),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF1557D6),
+              ),
+              child: const Text(
+                'View All',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+              ),
             ),
           ],
         ),
 
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
 
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            children: records.map((record) {
-              return buildRecordItem(record);
-            }).toList(),
-          ),
+        Column(
+          children: records.map((record) {
+            return buildRecordItem(record);
+          }).toList(),
         ),
       ],
     );
@@ -877,21 +1033,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // ============================================================
 
   Widget buildRecordItem(Map<String, String> record) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE8EDF5)),
+      ),
       child: Row(
         children: [
           Container(
-            width: 34,
-            height: 34,
-            decoration: const BoxDecoration(
-              color: Color(0xFFE8F8EE),
-              shape: BoxShape.circle,
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F8EE),
+              borderRadius: BorderRadius.circular(13),
             ),
-            child: const Icon(Icons.check, size: 18, color: Color(0xFF16A34A)),
+            child: const Icon(Icons.check, size: 20, color: Color(0xFF16A34A)),
           ),
 
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
 
           Expanded(
             child: Column(
@@ -900,8 +1062,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Text(
                   '${record['day']}, ${record['date']}',
                   style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
                     color: Color(0xFF172033),
                   ),
                 ),
@@ -911,7 +1073,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Text(
                   record['time']!,
                   style: const TextStyle(
-                    fontSize: 10,
+                    fontSize: 11.5,
                     color: Color(0xFF6B7280),
                   ),
                 ),
@@ -920,16 +1082,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
 
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: const Color(0xFFE8F8EE),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
               record['status']!,
               style: const TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w600,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
                 color: Color(0xFF15803D),
               ),
             ),
@@ -1030,8 +1192,8 @@ class MapPlaceholderPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final Paint paint = Paint()
-      ..color = const Color(0xFFD7E0EA)
-      ..strokeWidth = 2
+      ..color = const Color(0xFFCBD8EA)
+      ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 
     // Garis horizontal.
