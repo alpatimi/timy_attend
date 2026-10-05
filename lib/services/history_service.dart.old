@@ -1,0 +1,66 @@
+import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'api_services.dart.old';
+
+class HistoryService {
+  final ApiService apiService = ApiService();
+
+ Future<List<Map<String, dynamic>>> getHistory({
+  required String start,
+  String? end,
+}) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    print('================ HISTORY DEBUG ================');
+    print('TOKEN ADA: ${token != null}');
+    print('TOKEN LENGTH: ${token?.length}');
+    print('START: $start');
+    print('END: $end');
+
+    if (token == null) {
+      print('TOKEN NULL!');
+      return [];
+    }
+
+    final response = await apiService.dio.get(
+      '/absen/history',
+      queryParameters: {
+        'start': start,
+        if (end != null) 'end': end,
+      },
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ),
+    );
+
+    print('HISTORY STATUS: ${response.statusCode}');
+    print('HISTORY RESPONSE: ${response.data}');
+    print('================================================');
+
+    final data = response.data['data'];
+
+    if (data is List) {
+      return List<Map<String, dynamic>>.from(data);
+    }
+
+    return [];
+  } catch (e) {
+    print('================ HISTORY ERROR ================');
+    print('ERROR: $e');
+
+    if (e is DioException) {
+      print('STATUS CODE: ${e.response?.statusCode}');
+      print('RESPONSE DATA: ${e.response?.data}');
+    }
+
+    print('================================================');
+
+    return [];
+  }
+}
+}

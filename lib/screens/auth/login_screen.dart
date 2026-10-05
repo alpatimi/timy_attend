@@ -1,33 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:timy_attend/controllers/history_absen.dart';
+import 'package:timy_attend/controllers/login_user.dart';
+import 'package:timy_attend/models/login/login_request_model.dart';
+import 'package:timy_attend/preferences/login_preferences.dart';
+import 'package:timy_attend/riverpod/user_riverpod.dart';
 import 'package:timy_attend/screens/auth/register_screen.dart';
 import 'package:timy_attend/screens/dashboard/dashboard_screen.dart';
-import 'package:timy_attend/services/auth_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
-  final AuthService authService = AuthService();
-  // Controller untuk mengambil isi email.
+class _LoginScreenState extends ConsumerState<LoginScreen> {
+  final _formKey = GlobalKey<FormState>();
+
   final TextEditingController emailController = TextEditingController();
-  // Controller untuk mengambil isi password.
   final TextEditingController passwordController = TextEditingController();
 
-  // Menentukan apakah password sedang disembunyikan.
   bool isPasswordHidden = true;
 
   @override
   void dispose() {
-    // Membersihkan controller ketika halaman dihancurkan.
     emailController.dispose();
-
-    // Membersihkan controller password.
     passwordController.dispose();
-
     super.dispose();
   }
 
@@ -42,24 +41,42 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    final success = await authService.login(email, password);
-
-    if (!mounted) return;
-
-    if (success) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const DashboardScreen()),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Email atau password salah.')),
-      );
-    }
+    final loginRequest = LoginRequestModel(email: email, password: password);
+    ref.read(loginUserProvider.notifier).login(loginRequest);
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(loginUserProvider, (previous, next) {
+      next.whenOrNull(
+        data: (response) async {
+          if (response == null) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Login berhasil. ${response.data?.user?.name}'),
+            ),
+          );
+
+          await LoginPreferences.saveLoginResponse(response);
+
+          ref.invalidate(userNameRiverpod);
+          ref.invalidate(historyAbsenProvider);
+
+          if (context.mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const DashboardScreen()),
+            );
+          }
+        },
+        error: (error, _) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Login gagal. ${error.toString()}')),
+          );
+        },
+      );
+    });
+
     return Scaffold(
       body: Container(
         // Latar belakang gradasi lembut.
@@ -128,234 +145,237 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ],
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // =========================
-                          // HEADING
-                          // =========================
-                          const Text(
-                            'Welcome back',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.4,
-                              color: Color(0xFF172033),
-                            ),
-                          ),
-
-                          const SizedBox(height: 4),
-
-                          const Text(
-                            'Sign in to continue to your account.',
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              color: Color(0xFF6B7280),
-                            ),
-                          ),
-
-                          const SizedBox(height: 28),
-
-                          // =========================
-                          // EMAIL LABEL
-                          // =========================
-                          const Text(
-                            'Email Address',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF172033),
-                            ),
-                          ),
-
-                          const SizedBox(height: 8),
-
-                          // =========================
-                          // EMAIL INPUT
-                          // =========================
-                          TextField(
-                            controller: emailController,
-
-                            keyboardType: TextInputType.emailAddress,
-
-                            style: const TextStyle(
-                              fontSize: 15,
-                              color: Color(0xFF172033),
-                            ),
-
-                            decoration: InputDecoration(
-                              hintText: 'Enter your email',
-                              hintStyle: const TextStyle(
-                                color: Color(0xFF9CA3AF),
-                                fontSize: 14,
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // =========================
+                            // HEADING
+                            // =========================
+                            const Text(
+                              'Welcome back',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.4,
+                                color: Color(0xFF172033),
                               ),
-                              prefixIcon: const Icon(
-                                Icons.email_outlined,
+                            ),
+
+                            const SizedBox(height: 4),
+
+                            const Text(
+                              'Sign in to continue to your account.',
+                              style: TextStyle(
+                                fontSize: 13.5,
                                 color: Color(0xFF6B7280),
                               ),
-                              filled: true,
-                              fillColor: const Color(0xFFF4F7FB),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide.none,
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFFE5EAF2),
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFF1557D6),
-                                  width: 1.6,
-                                ),
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // =========================
-                          // PASSWORD LABEL
-                          // =========================
-                          const Text(
-                            'Password',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF172033),
-                            ),
-                          ),
-
-                          const SizedBox(height: 8),
-
-                          // =========================
-                          // PASSWORD INPUT
-                          // =========================
-                          TextField(
-                            controller: passwordController,
-
-                            // Menyembunyikan password.
-                            obscureText: isPasswordHidden,
-
-                            style: const TextStyle(
-                              fontSize: 15,
-                              color: Color(0xFF172033),
                             ),
 
-                            decoration: InputDecoration(
-                              hintText: 'Enter your password',
-                              hintStyle: const TextStyle(
-                                color: Color(0xFF9CA3AF),
-                                fontSize: 14,
-                              ),
+                            const SizedBox(height: 28),
 
-                              prefixIcon: const Icon(
-                                Icons.lock_outline,
-                                color: Color(0xFF6B7280),
-                              ),
-
-                              // Tombol untuk melihat/menyembunyikan password.
-                              suffixIcon: IconButton(
-                                onPressed: () {
-                                  setState(() {
-                                    isPasswordHidden = !isPasswordHidden;
-                                  });
-                                },
-                                icon: Icon(
-                                  isPasswordHidden
-                                      ? Icons.visibility_outlined
-                                      : Icons.visibility_off_outlined,
-                                  color: const Color(0xFF6B7280),
-                                ),
-                              ),
-
-                              filled: true,
-                              fillColor: const Color(0xFFF4F7FB),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide.none,
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFFE5EAF2),
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFF1557D6),
-                                  width: 1.6,
-                                ),
+                            // =========================
+                            // EMAIL LABEL
+                            // =========================
+                            const Text(
+                              'Email Address',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF172033),
                               ),
                             ),
-                          ),
 
-                          const SizedBox(height: 12),
+                            const SizedBox(height: 8),
 
-                          // =========================
-                          // FORGOT PASSWORD
-                          // =========================
-                          // Align(
-                          //   alignment: Alignment.centerRight,
-                          //   child: TextButton(
-                          //     onPressed: () {
-                          //       // Fitur forgot password belum diperlukan
-                          //       // untuk tahap tugas ini.
-                          //     },
-                          //     child: const Text(
-                          //       'Forgot password?',
-                          //     ),
-                          //   ),
-                          // ),
-                          const SizedBox(height: 12),
+                            // =========================
+                            // EMAIL INPUT
+                            // =========================
+                            TextField(
+                              controller: emailController,
 
-                          // =========================
-                          // LOGIN BUTTON
-                          // =========================
-                          Container(
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Color(0x401557D6),
-                                  blurRadius: 18,
-                                  offset: Offset(0, 8),
+                              keyboardType: TextInputType.emailAddress,
+
+                              style: const TextStyle(
+                                fontSize: 15,
+                                color: Color(0xFF172033),
+                              ),
+
+                              decoration: InputDecoration(
+                                hintText: 'Enter your email',
+                                hintStyle: const TextStyle(
+                                  color: Color(0xFF9CA3AF),
+                                  fontSize: 14,
                                 ),
-                              ],
-                            ),
-                            child: ElevatedButton(
-                              onPressed: _login,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF1557D6),
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                minimumSize: const Size.fromHeight(54),
-                                shape: RoundedRectangleBorder(
+                                prefixIcon: const Icon(
+                                  Icons.email_outlined,
+                                  color: Color(0xFF6B7280),
+                                ),
+                                filled: true,
+                                fillColor: const Color(0xFFF4F7FB),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 16,
+                                ),
+                                border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide.none,
                                 ),
-                                textStyle: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.3,
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFE5EAF2),
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFF1557D6),
+                                    width: 1.6,
+                                  ),
                                 ),
                               ),
-                              child: const Text('Login'),
                             ),
-                          ),
-                        ],
+
+                            const SizedBox(height: 20),
+
+                            // =========================
+                            // PASSWORD LABEL
+                            // =========================
+                            const Text(
+                              'Password',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF172033),
+                              ),
+                            ),
+
+                            const SizedBox(height: 8),
+
+                            // =========================
+                            // PASSWORD INPUT
+                            // =========================
+                            TextField(
+                              controller: passwordController,
+
+                              // Menyembunyikan password.
+                              obscureText: isPasswordHidden,
+
+                              style: const TextStyle(
+                                fontSize: 15,
+                                color: Color(0xFF172033),
+                              ),
+
+                              decoration: InputDecoration(
+                                hintText: 'Enter your password',
+                                hintStyle: const TextStyle(
+                                  color: Color(0xFF9CA3AF),
+                                  fontSize: 14,
+                                ),
+
+                                prefixIcon: const Icon(
+                                  Icons.lock_outline,
+                                  color: Color(0xFF6B7280),
+                                ),
+
+                                // Tombol untuk melihat/menyembunyikan password.
+                                suffixIcon: IconButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      isPasswordHidden = !isPasswordHidden;
+                                    });
+                                  },
+                                  icon: Icon(
+                                    isPasswordHidden
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                    color: const Color(0xFF6B7280),
+                                  ),
+                                ),
+
+                                filled: true,
+                                fillColor: const Color(0xFFF4F7FB),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 16,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide.none,
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFE5EAF2),
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFF1557D6),
+                                    width: 1.6,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 12),
+
+                            // =========================
+                            // FORGOT PASSWORD
+                            // =========================
+                            // Align(
+                            //   alignment: Alignment.centerRight,
+                            //   child: TextButton(
+                            //     onPressed: () {
+                            //       // Fitur forgot password belum diperlukan
+                            //       // untuk tahap tugas ini.
+                            //     },
+                            //     child: const Text(
+                            //       'Forgot password?',
+                            //     ),
+                            //   ),
+                            // ),
+                            const SizedBox(height: 12),
+
+                            // =========================
+                            // LOGIN BUTTON
+                            // =========================
+                            Container(
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Color(0x401557D6),
+                                    blurRadius: 18,
+                                    offset: Offset(0, 8),
+                                  ),
+                                ],
+                              ),
+                              child: ElevatedButton(
+                                onPressed: _login,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF1557D6),
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  minimumSize: const Size.fromHeight(54),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  textStyle: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                                child: const Text('Login'),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
 

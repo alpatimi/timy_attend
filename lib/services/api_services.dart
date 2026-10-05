@@ -1,17 +1,70 @@
+
 import 'package:dio/dio.dart';
+import 'package:retrofit/retrofit.dart';
+import 'package:timy_attend/models/absen/absen_response_model.dart';
+import 'package:timy_attend/models/absen/check_in_request_model.dart';
+import 'package:timy_attend/models/absen/check_out_request_model.dart';
+import 'package:timy_attend/models/absen/delete_absen_request_model.dart';
+import 'package:timy_attend/models/absen/history_absen_response_model.dart';
+import 'package:timy_attend/models/absen/izin_request_model.dart';
+import 'package:timy_attend/models/login/login_request_model.dart';
+import 'package:timy_attend/models/login/login_response_model.dart';
+import 'package:timy_attend/models/register/register_request_model.dart';
+import 'package:timy_attend/models/register/register_response_model.dart';
+import 'package:timy_attend/models/user/name_user_edit_request_model.dart';
+import 'package:timy_attend/models/user/profil_user_response_model.dart';
 
-class ApiService {
-  final Dio dio = Dio(
-    BaseOptions(
-      baseUrl: 'https://absensib1.mobileprojp.com/api',
+part 'api_services.g.dart';
 
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
+@RestApi(baseUrl: 'https://absensib1.mobileprojp.com')
+abstract class ApiServices {
+  factory ApiServices(Dio dio, {String? baseUrl}) = _ApiServices;
 
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-    ),
+  @POST('/api/register')
+  Future<RegisterResponseModel> registerUser(@Body() RegisterRequestModel user);
+
+  @POST('/api/login')
+  Future<LoginResponseModel> loginUser(@Body() LoginRequestModel user);
+
+  @GET('/api/absen/history')
+  Future<HistoryAbsenResponseModel> getAbsenHistory({
+    @Header('Authorization') String? token,
+  });
+
+  @POST('/api/absen/check-in')
+  Future<AbsenResponseModel> checkInUser(
+    @Header('Authorization') String? token,
+    @Body() CheckInRequestModel checkIn,
+  );
+
+  @POST('/api/absen/check-in')
+  Future<AbsenResponseModel> submitIzin(
+    @Header('Authorization') String? token,
+    @Body() IzinRequestModel izin,
+  );
+
+  @POST('/api/absen/check-out')
+  Future<AbsenResponseModel> checkOutUser(
+    @Header('Authorization') String? token,
+    @Body() CheckOutRequestModel checkOut,
+  );
+
+  //Delete Absen
+  @DELETE('/api/absen/{id}')
+  Future<AbsenResponseModel> deletePresensi(
+    @Path('id') int id,
+    @Header('Authorization') String? token,
+    @Body() DeleteAbsenRequestModel delete,
+  );
+
+  @GET('/api/profile')
+  Future<ProfilUserResponseModel> getProfile({
+    @Header('Authorization') String? token,
+  });
+
+  @PUT('/api/profile')
+  Future<ProfilUserResponseModel> editProfile(
+    @Header('Authorization') String? token,
+    @Body() NameUserEditRequestModel userName,
   );
 }

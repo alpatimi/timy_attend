@@ -1,97 +1,57 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:timy_attend/controllers/check_in_user.dart';
+import 'package:timy_attend/controllers/check_out_user.dart';
+import 'package:timy_attend/controllers/history_absen.dart';
+import 'package:timy_attend/models/absen/check_in_request_model.dart';
+import 'package:timy_attend/models/absen/check_out_request_model.dart';
 import 'package:timy_attend/screens/history/history_screen.dart';
-import 'package:timy_attend/services/attendance_service.dart';
+import 'package:timy_attend/screens/maps/maps_widget.dart';
+import 'package:timy_attend/services/maps_services.dart';
 
 import '../profile/profile_screen.dart';
 
 import 'package:geolocator/geolocator.dart';
 
-class DashboardScreen extends StatefulWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
-  final AttendanceService attendanceService = AttendanceService();
-  // Menyimpan index menu yang sedang dipilih.
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   int selectedIndex = 0;
-
-  // Menentukan apakah user sudah melakukan check-in.
   bool isCheckedIn = false;
-
-  // Menentukan apakah user sudah melakukan check-out.
   bool isCheckedOut = false;
-
-  // Nama user sementara.
-  //
-  // Nanti akan berasal dari response API profile/login.
   final String userName = 'Timi';
 
   String? checkInTime;
   String? checkOutTime;
 
-  // Latitude sementara.
-  final String latitude = '-6.175392';
-
-  // Longitude sementara.
-  final String longitude = '106.824964';
-  Future<Position?> getCurrentLocation() async {
-    bool serviceEnabled;
-
-    // Cek apakah GPS/lokasi HP aktif
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-
-    if (!serviceEnabled) {
-      if (!mounted) return null;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Silakan aktifkan lokasi/GPS terlebih dahulu.'),
-        ),
+  Future<void> checkIn() async {
+    // 1. Loading AKTIF sebelum mengambil position/koordinat
+    try {
+      final Position coordinate = await MapsService().getCurrentLocation();
+      final String address = await MapsService().getAddressFromCoordinates(
+        coordinate.latitude,
+        coordinate.longitude,
       );
 
-      return null;
-    }
-
-    // Cek permission lokasi
-    LocationPermission permission = await Geolocator.checkPermission();
-
-    // Kalau belum diberikan, minta permission
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-
-      if (permission == LocationPermission.denied) {
-        if (!mounted) return null;
-
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Izin lokasi ditolak.')));
-
-        return null;
-      }
-    }
-
-    // Kalau ditolak permanen
-    if (permission == LocationPermission.deniedForever) {
-      if (!mounted) return null;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Izin lokasi ditolak permanen. Silakan aktifkan dari Settings.',
-          ),
-        ),
+      final checkInRequest = CheckInRequestModel(
+        checkInLat: '${coordinate.latitude}',
+        checkInLng: '${coordinate.longitude}',
+        status: 'masuk',
+        checkInAddress: address,
       );
 
-      return null;
+      await ref.read(checkInUserProvider.notifier).checkIn(checkInRequest);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal mendapatkan lokasi.')),
+      );
     }
-
-    // Ambil lokasi GPS
-    return await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-    );
   }
 
   @override
@@ -165,23 +125,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           buildHeader(),
-
           const SizedBox(height: 28),
-
           buildGreeting(),
-
           const SizedBox(height: 22),
-
           buildAttendanceCard(),
-
           const SizedBox(height: 22),
-
-          buildLocationCard(),
-
+          MapsWidget(),
           const SizedBox(height: 28),
-
           buildMonthlyAttendance(),
-
           const SizedBox(height: 28),
 
           buildRecentRecords(),
@@ -530,6 +481,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
       buttonIcon = Icons.login_rounded;
     }
 
+    //snackbar checkin
+    ref.listen(checkInUserProvider, (previous, next) {
+      next.whenOrNull(
+        data: (response) {
+          if (response == null) return;
+          ref.invalidate(historyAbsenProvider);
+
+          final now = DateTime.now();
+
+          setState(() {
+            isCheckedIn = true;
+            checkInTime =
+                '${now.hour.toString().padLeft(2, '0')}:'
+                '${now.minute.toString().padLeft(2, '0')}';
+          });
+
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Check In berhasil!')));
+        },
+        error: (error, _) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('Check In gagal!')));
+        },
+      );
+    });
+
+    //snackbar checkout
+    ref.listen(checkOutUserProvider, (previous, next) {
+      next.whenOrNull(
+        data: (response) {
+          if (response == null) return;
+          ref.invalidate(historyAbsenProvider);
+          if (context.mounted) {
+            Navigator.of(context).maybePop();
+          }
+          final now = DateTime.now();
+
+          setState(() {
+            isCheckedOut = true;
+            checkOutTime =
+                '${now.hour.toString().padLeft(2, '0')}:'
+                '${now.minute.toString().padLeft(2, '0')}';
+          });
+
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Check Out berhasil!')));
+        },
+        error: (error, _) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Check Out gagal. Silakan coba lagi.'),
+            ),
+          );
+        },
+      );
+    });
+
     return SizedBox(
       width: double.infinity,
       height: 54,
@@ -552,35 +562,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
         onPressed: buttonEnabled
             ? () async {
                 if (!isCheckedIn) {
-                  print('CHECK IN DITEKAN');
-                  final position = await getCurrentLocation();
-
-                  if (position == null) {
-                    return;
-                  }
-
-                  final success = await attendanceService.checkIn(
-                    latitude: position.latitude.toString(),
-                    longitude: position.longitude.toString(),
-                    address: 'Lokasi GPS',
-                  );
-
                   if (!mounted) return;
 
-                  if (success) {
-                    final now = DateTime.now();
+                  try {
+                    final Position coordinate = await MapsService()
+                        .getCurrentLocation();
+                    final String address = await MapsService()
+                        .getAddressFromCoordinates(
+                          coordinate.latitude,
+                          coordinate.longitude,
+                        );
 
-                    setState(() {
-                      isCheckedIn = true;
-                      checkInTime =
-                          '${now.hour.toString().padLeft(2, '0')}:'
-                          '${now.minute.toString().padLeft(2, '0')}';
-                    });
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Check In berhasil!')),
+                    final checkInRequest = CheckInRequestModel(
+                      checkInLat: '${coordinate.latitude}',
+                      checkInLng: '${coordinate.longitude}',
+                      status: 'masuk',
+                      checkInAddress: address,
                     );
-                  } else {
+
+                    //request checkin
+                    await ref
+                        .read(checkInUserProvider.notifier)
+                        .checkIn(checkInRequest);
+                  } catch (e) {
+                    if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Check In gagal. Silakan coba lagi.'),
@@ -588,32 +593,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     );
                   }
                 } else {
-                  final success = await attendanceService.checkOut(
-                    latitude: latitude,
-                    longitude: longitude,
-                    address: 'Jakarta',
-                  );
-
                   if (!mounted) return;
+                  try {
+                    final Position coordinate = await MapsService()
+                        .getCurrentLocation();
+                    final String address = await MapsService()
+                        .getAddressFromCoordinates(
+                          coordinate.latitude,
+                          coordinate.longitude,
+                        );
 
-                  if (success) {
-                    final now = DateTime.now();
-
-                    setState(() {
-                      isCheckedOut = true;
-                      checkOutTime =
-                          '${now.hour.toString().padLeft(2, '0')}:'
-                          '${now.minute.toString().padLeft(2, '0')}';
-                    });
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Check Out berhasil!')),
+                    final checkOutRequest = CheckOutRequestModel(
+                      checkOutLocation:
+                          '${coordinate.latitude}, ${coordinate.longitude}',
+                      checkOutAddress: address,
+                      checkOutLat: '${coordinate.latitude}',
+                      checkOutLng: '${coordinate.longitude}',
                     );
-                  } else {
+                    //post checkout
+                    await ref
+                        .read(checkOutUserProvider.notifier)
+                        .checkOut(checkOutRequest);
+                  } catch (e) {
+                    if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Check Out gagal. Silakan coba lagi.'),
-                      ),
+                      const SnackBar(content: Text('Gagal mendapatkan lokasi')),
                     );
                   }
                 }
@@ -723,9 +727,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       border: Border.all(color: Colors.white, width: 3),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(
-                            0xFF1557D6,
-                          ).withValues(alpha: 0.3),
+                          color: const Color(0xFF1557D6).withValues(alpha: 0.3),
                           blurRadius: 14,
                           spreadRadius: 6,
                         ),
@@ -794,7 +796,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
               Expanded(
                 child: Text(
-                  'Lat: $latitude   •   Long: $longitude',
+                  'Lat:    •   Long: ',
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,

@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:timy_attend/controllers/profile_user.dart';
 import 'package:timy_attend/screens/auth/login_screen.dart';
 
 import 'edit_profile_screen.dart';
-import '../../services/profile_service.dart';
 
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
-  final ProfileService profileService = ProfileService();
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   String userName = '';
   String userEmail = '';
   String userRole = 'Student';
@@ -23,30 +23,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    loadProfile();
-  }
-
-  Future<void> loadProfile() async {
-    final profile = await profileService.getProfile();
-
-    if (!mounted) return;
-
-    if (profile != null) {
-      setState(() {
-        userName = profile['name'] ?? '';
-        userEmail = profile['email'] ?? '';
-        userId = profile['id']?.toString() ?? '';
-        isLoading = false;
-      });
-    } else {
-      setState(() {
-        isLoading = false;
-      });
-    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final profileAsync = ref.watch(profileUserProvider);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FB),
       body: isLoading

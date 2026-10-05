@@ -1,0 +1,265 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:timy_attend/riverpod/map_refresh.dart';
+import 'package:timy_attend/services/maps_services.dart';
+
+class MapsWidget extends ConsumerStatefulWidget {
+  final MapsService? mapsService;
+  final double? mapHeight;
+
+  const MapsWidget({super.key, this.mapsService, this.mapHeight});
+
+  @override
+  ConsumerState<MapsWidget> createState() => _MapsWidgetState();
+}
+
+class _MapsWidgetState extends ConsumerState<MapsWidget> {
+  late final MapsService _mapsService;
+
+  GoogleMapController? _mapController;
+  Position? _currentPosition;
+  String _currentAddress = "Mencari Lokasi...";
+  bool _isLoading = false;
+
+  final Set<Marker> _markers = {};
+  final LatLng _defaultLocation = const LatLng(-6.2000, 108.8166666);
+
+  @override
+  void initState() {
+    super.initState();
+    _mapsService = widget.mapsService ?? MapsService();
+    _fetchLocationAndAddress();
+  }
+
+  @override
+  void dispose() {
+    _mapController?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchLocationAndAddress() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _currentAddress = "Mencari Lokasi...";
+    });
+
+    try {
+      final position = await _mapsService.getCurrentLocation();
+      final latLng = LatLng(position.latitude, position.longitude);
+
+      if (!mounted) return;
+      setState(() {
+        _currentPosition = position;
+      });
+
+      _updateMarkerAndCamera(latLng);
+
+      final address = await _mapsService.getAddressFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _currentAddress = address;
+      });
+    } on LocationServiceDisabledException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _currentAddress = e.message;
+      });
+    } on LocationPermissionDeniedException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _currentAddress = e.message;
+      });
+    } on LocationPermissionPermanentlyDeniedException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _currentAddress = e.message;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _currentAddress = "Gagal memuat lokasi: $e";
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _updateMarkerAndCamera(LatLng latLng) {
+    if (!mounted) return;
+    setState(() {
+      _markers.clear();
+      _markers.add(
+        Marker(
+          markerId: const MarkerId("currentLocation"),
+          position: latLng,
+          infoWindow: InfoWindow(
+            title: "Lokasi Anda",
+            snippet: _currentAddress,
+          ),
+        ),
+      );
+    });
+
+    _mapController?.animateCamera(
+      CameraUpdate.newCameraPosition(CameraPosition(target: latLng, zoom: 15)),
+    );
+  }
+
+  Future<void> _openInGoogleMaps() async {
+    if (_currentPosition == null) return;
+
+    final success = await _mapsService.openGoogleMaps(
+      _currentPosition!.latitude,
+      _currentPosition!.longitude,
+    );
+
+    if (!success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal mendapatkan lokasi.')),
+      );
+    }
+  }
+
+  void refreshLocation() {
+    _fetchLocationAndAddress();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<int>(mapRefreshTriggerProvider, (previous, next) {
+      if (previous != null && next > previous) {
+        _fetchLocationAndAddress();
+      }
+    });
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.pin_drop, size: 20, color: Colors.red),
+                    const SizedBox(width: 8),
+                    Text('Peta Lokasi Saat Ini'),
+                  ],
+                ),
+                GestureDetector(
+                  onTap: _isLoading ? null : _fetchLocationAndAddress,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(shape: BoxShape.circle),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh, size: 16),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              height: widget.mapHeight ?? 200,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.black),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: GoogleMap(
+                initialCameraPosition: CameraPosition(
+                  target: _currentPosition != null
+                      ? LatLng(
+                          _currentPosition!.latitude,
+                          _currentPosition!.longitude,
+                        )
+                      : _defaultLocation,
+                  zoom: 15.0,
+                ),
+                markers: _markers,
+                myLocationEnabled: true,
+                myLocationButtonEnabled: false,
+                zoomControlsEnabled: false,
+                mapToolbarEnabled: true,
+                gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                  Factory<OneSequenceGestureRecognizer>(
+                    () => EagerGestureRecognizer(),
+                  ),
+                },
+                onMapCreated: (GoogleMapController controller) {
+                  _mapController = controller;
+                  if (_currentPosition != null) {
+                    _updateMarkerAndCamera(
+                      LatLng(
+                        _currentPosition!.latitude,
+                        _currentPosition!.longitude,
+                      ),
+                    );
+                  }
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.map, size: 16, color: Colors.blueAccent),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _isLoading
+                      ? Text("Memperbarui alamat...")
+                      : Text(_currentAddress),
+                ),
+              ],
+            ),
+            if (_currentPosition != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${_currentPosition!.latitude.toStringAsFixed(5)}, ${_currentPosition!.longitude.toStringAsFixed(5)}',
+                  ),
+                  GestureDetector(
+                    onTap: _openInGoogleMaps,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('Buka di Google Maps'),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.open_in_new,
+                          size: 12,
+                          color: Colors.blueAccent,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}

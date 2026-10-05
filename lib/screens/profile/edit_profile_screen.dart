@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:timy_attend/controllers/edit_profile.dart';
+import 'package:timy_attend/models/user/name_user_edit_request_model.dart';
 
-import '../../services/profile_service.dart';
-
-class EditProfileScreen extends StatefulWidget {
+class EditProfileScreen extends ConsumerStatefulWidget {
   // Data user saat ini.
   final String currentName;
 
@@ -18,11 +19,10 @@ class EditProfileScreen extends StatefulWidget {
   });
 
   @override
-  State<EditProfileScreen> createState() => _EditProfileScreenState();
+  ConsumerState<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
-class _EditProfileScreenState extends State<EditProfileScreen> {
-  final ProfileService profileService = ProfileService();
+class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   bool isLoading = false;
   // Controller untuk nama.
   late TextEditingController nameController;
@@ -323,43 +323,84 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       isLoading = true;
     });
 
-final updatedProfile = await profileService.updateProfile(
-  name: nameController.text.trim(),
-);
+    try {
+      final newName = nameController.text.trim();
+      final request = NameUserEditRequestModel(name: newName);
+
+      final response = await ref
+          .read(editProfileProvider.notifier)
+          .editProfile(request);
+
+      if (!mounted) return;
+
+      if (response != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Berhasil menyimpan!, Nama Profil berhasil diperbarui!',
+            ),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.of(context).pop();
+      } else {
+        final editState = ref.read(editProfileProvider);
+        final errorMsg = editState.hasError
+            ? editState.error.toString()
+            : 'Gagal memperbarui profil';
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMsg),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+
+      if (response != null) {
+        // Ambil objek user/data jika dibungkus oleh response backend
+        final userData = response.data ?? response.data?.name ?? response.data;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profil berhasil diperbarui!'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+
+        Navigator.pop(context, {
+          'name': (userData is Map ? userData['name'] : null) ?? name,
+          'email': (userData is Map ? userData['email'] : null) ?? email,
+          'role': selectedRole,
+        });
+      } else {
+        showError('Gagal memperbarui profil. Periksa koneksi atau input Anda.');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Gagal menyimpan, terjadi kesalahan'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
 
     if (!mounted) return;
 
     setState(() {
       isLoading = false;
     });
-
-    if (updatedProfile != null) {
-      // Ambil objek user/data jika dibungkus oleh response backend
-      final userData =
-          updatedProfile['data'] ?? updatedProfile['user'] ?? updatedProfile;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profil berhasil diperbarui!'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-
-      Navigator.pop(context, {
-        'name': (userData is Map ? userData['name'] : null) ?? name,
-        'email': (userData is Map ? userData['email'] : null) ?? email,
-        'role': selectedRole,
-      });
-    } else {
-      showError('Gagal memperbarui profil. Periksa koneksi atau input Anda.');
-    }
   }
 
   // ============================================================
   // ERROR MESSAGE
   // ============================================================
-void showError(String message) {
+  void showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
