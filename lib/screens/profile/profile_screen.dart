@@ -18,42 +18,60 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   String userRole = 'Student';
   String userId = '';
   String userBatch = 'Batch 4 - Android Developer';
-
-  bool isLoading = true;
   @override
   void initState() {
     super.initState();
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(profileUserProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FB),
-      body: isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF1557D6)),
-            )
-          : SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 18, 20, 30),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    buildHeader(),
-                    const SizedBox(height: 26),
-                    buildProfileCard(),
-                    const SizedBox(height: 28),
-                    buildAccountSection(),
-                    const SizedBox(height: 24),
-                    buildApplicationSection(),
-                    const SizedBox(height: 28),
-                    buildLogoutButton(),
-                  ],
-                ),
+      body: profileAsync.when(
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: Color(0xFF1557D6)),
+        ),
+
+        error: (error, stackTrace) => Center(
+          child: Text(
+            'Gagal mengambil profil:\n$error',
+            textAlign: TextAlign.center,
+          ),
+        ),
+
+        data: (profile) {
+          if (profile == null || profile.data == null) {
+            return const Center(child: Text('Data profil tidak ditemukan'));
+          }
+
+          userName = profile.data?.name ?? '';
+          userEmail = profile.data?.email ?? '';
+          userId = profile.data?.id?.toString() ?? '';
+
+          return SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 30),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  buildHeader(),
+                  const SizedBox(height: 26),
+                  buildProfileCard(),
+                  const SizedBox(height: 28),
+                  buildAccountSection(),
+                  const SizedBox(height: 24),
+                  buildApplicationSection(),
+                  const SizedBox(height: 28),
+                  buildLogoutButton(),
+                ],
               ),
             ),
+          );
+        },
+      ),
     );
   }
 

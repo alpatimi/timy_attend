@@ -1,51 +1,447 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:timy_attend/controllers/history_absen.dart';
+import 'package:timy_attend/core/theme/app_theme.dart';
 
-
-class HistoryScreen extends ConsumerStatefulWidget {
+class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key});
 
   @override
-  ConsumerState<HistoryScreen> createState() => _HistoryScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    final historyAsync = ref.watch(historyAbsenProvider);
 
-class _HistoryScreenState extends ConsumerState<HistoryScreen> {
+    return Container(
+      color: c.bg,
+      child: historyAsync.when(
+        // =========================
+        // LOADING
+        // =========================
+        loading: () => Center(
+          child: CircularProgressIndicator(color: c.primary, strokeWidth: 3),
+        ),
 
-  bool isLoading = true;
+        // =========================
+        // ERROR
+        // =========================
+        error: (error, stackTrace) => _buildError(c, ref, error),
 
-  // Filter bulan yang sedang dipilih.
-  String selectedMonth = 'Oktober 2026';
+        // =========================
+        // DATA
+        // =========================
+        data: (response) {
+          final history = response?.data ?? [];
 
-  // Data history dari API.
-  List<Map<String, String>> attendanceHistory = [];
+          return RefreshIndicator(
+            color: c.primary,
+            backgroundColor: c.surface,
+            onRefresh: () async {
+              await ref.read(historyAbsenProvider.notifier).refresh();
+            },
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              slivers: [
+                SliverToBoxAdapter(child: _buildHeader(c, history)),
+                if (history.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _buildEmpty(c),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+                    sliver: SliverList.builder(
+                      itemCount: history.length,
+                      itemBuilder: (context, index) {
+                        return buildHistoryCard(c, history[index]);
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
 
-  // @override
-  // void initState() {
-  //   super.initState();
-    // loadHistory();
-  // }
+  // ============================================================
+  // HEADER + SUMMARY
+  // ============================================================
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
+  Widget _buildHeader(AppColors c, List<dynamic> history) {
+    final presentCount = history.where((e) => e.status == 'masuk').length;
+    final permissionCount = history.where((e) => e.status == 'izin').length;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Attendance History',
+            style: TextStyle(
+              color: c.text,
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Riwayat kehadiran kamu',
+            style: TextStyle(color: c.textMuted, fontSize: 13),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              _buildSummaryTile(
+                c,
+                label: 'Total',
+                value: history.length.toString(),
+                icon: Icons.event_note_rounded,
+                color: c.primary,
+                soft: c.primarySoft,
+              ),
+              const SizedBox(width: 10),
+              _buildSummaryTile(
+                c,
+                label: 'Present',
+                value: presentCount.toString(),
+                icon: Icons.check_circle_rounded,
+                color: c.success,
+                soft: c.successSoft,
+              ),
+              const SizedBox(width: 10),
+              _buildSummaryTile(
+                c,
+                label: 'Permission',
+                value: permissionCount.toString(),
+                icon: Icons.assignment_late_rounded,
+                color: c.warning,
+                soft: c.warningSoft,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryTile(
+    AppColors c, {
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color color,
+    required Color soft,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: c.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: c.border),
+        ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header halaman.
-            buildHeader(),
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: soft,
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: Icon(icon, size: 16, color: color),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: c.text,
+              ),
+            ),
+            Text(label, style: TextStyle(fontSize: 11, color: c.textMuted)),
+          ],
+        ),
+      ),
+    );
+  }
 
-            // Isi history.
+  // ============================================================
+  // STATES
+  // ============================================================
+
+  Widget _buildEmpty(AppColors c) {
+    return Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              color: c.primarySoft,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.history_rounded, size: 44, color: c.primary),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Belum ada riwayat absensi.',
+            style: TextStyle(
+              color: c.text,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Tarik ke bawah untuk memuat ulang.',
+            style: TextStyle(color: c.textMuted, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildError(AppColors c, WidgetRef ref, Object error) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: c.border),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: c.dangerSoft,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.wifi_off_rounded,
+                  size: 36,
+                  color: c.danger,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Gagal memuat riwayat absensi',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: c.text,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                error.toString(),
+                textAlign: TextAlign.center,
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, color: c.textMuted),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: c.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onPressed: () {
+                    ref.read(historyAbsenProvider.notifier).refresh();
+                  },
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Coba Lagi'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // HISTORY CARD
+  // ============================================================
+
+  Widget buildHistoryCard(AppColors c, dynamic item) {
+    final statusStyle = _statusStyle(c, item.status);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: c.border),
+        boxShadow: [
+          BoxShadow(
+            color: statusStyle.color.withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Garis aksen sesuai status.
+            Container(width: 5, color: statusStyle.color),
+
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    buildSummary(),
-                    const SizedBox(height: 20),
-                    buildMonthFilter(),
-                    const SizedBox(height: 20),
-                    buildHistoryList(),
+                    // =========================
+                    // DATE + STATUS
+                    // =========================
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_today_rounded,
+                          size: 15,
+                          color: c.textMuted,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            formatDate(item.createdAt),
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: c.text,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusStyle.soft,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                statusStyle.icon,
+                                size: 12,
+                                color: statusStyle.color,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                formatStatus(item.status),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: statusStyle.color,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // =========================
+                    // CHECK IN / CHECK OUT
+                    // =========================
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: c.surfaceAlt,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: buildTime(
+                              c,
+                              title: 'Check-in',
+                              value: formatTime(item.checkIn),
+                              icon: Icons.login_rounded,
+                              iconColor: c.success,
+                            ),
+                          ),
+                          Container(width: 1, height: 32, color: c.border),
+                          Expanded(
+                            child: buildTime(
+                              c,
+                              title: 'Check-out',
+                              value: formatTime(item.checkOut),
+                              icon: Icons.logout_rounded,
+                              iconColor: c.danger,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // =========================
+                    // LOCATION
+                    // =========================
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: c.primarySoft,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.location_on_rounded,
+                            size: 14,
+                            color: c.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              item.checkInAddress ?? '-',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                height: 1.4,
+                                color: c.textMuted,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -57,63 +453,84 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   }
 
   // ============================================================
-  // LOAD HISTORY DARI API
+  // TIME
   // ============================================================
 
-  // Future<void> loadHistory() async {
-  //   final data = await historyService.getHistory(
-  //     start: '2026-10-01',
-  //     end: '2026-10-31',
-  //   );
-
-  //   final formattedData = data.map((item) {
-  //     final checkIn = item['check_in']?.toString() ?? '';
-  //     final checkOut = item['check_out']?.toString() ?? '';
-
-  //     return <String, String>{
-  //       'date': formatDate(checkIn),
-  //       'day': getDay(checkIn),
-  //       'checkIn': formatTime(checkIn),
-  //       'checkOut': formatTime(checkOut),
-  //       'location': item['check_in_address']?.toString() ?? '-',
-  //       'status': formatStatus(item['status']?.toString() ?? ''),
-  //     };
-  //   }).toList();
-
-  //   if (!mounted) return;
-
-  //   setState(() {
-  //     attendanceHistory = formattedData;
-  //     isLoading = false;
-  //   });
-  // }
-
-
+  Widget buildTime(
+    AppColors c, {
+    required String title,
+    required String value,
+    IconData? icon,
+    Color? iconColor,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 18, color: iconColor ?? c.textMuted),
+            const SizedBox(width: 8),
+          ],
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: TextStyle(fontSize: 11, color: c.textMuted)),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: c.text,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
   // ============================================================
-  // FORMAT TANGGAL
+  // STATUS STYLE
   // ============================================================
 
-  String formatDate(String dateTime) {
-    if (dateTime.isEmpty) {
-      return '-';
+  ({Color color, Color soft, IconData icon}) _statusStyle(
+    AppColors c,
+    String? status,
+  ) {
+    switch (status) {
+      case 'masuk':
+        return (
+          color: c.success,
+          soft: c.successSoft,
+          icon: Icons.check_circle_rounded,
+        );
+      case 'izin':
+        return (
+          color: c.warning,
+          soft: c.warningSoft,
+          icon: Icons.assignment_late_rounded,
+        );
+      default:
+        return (
+          color: c.textMuted,
+          soft: c.surfaceAlt,
+          icon: Icons.info_rounded,
+        );
     }
+  }
 
-    final date = DateTime.tryParse(dateTime);
+  // ============================================================
+  // FORMAT DATE
+  // ============================================================
 
+  String formatDate(DateTime? date) {
     if (date == null) {
       return '-';
     }
 
-    return '${date.day.toString().padLeft(2, '0')} '
-        '${monthName(date.month)} ${date.year}';
-  }
-
-  // ============================================================
-  // NAMA BULAN
-  // ============================================================
-
-  String monthName(int month) {
     const months = [
       'Jan',
       'Feb',
@@ -129,47 +546,21 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       'Dec',
     ];
 
-    return months[month - 1];
+    return '${date.day.toString().padLeft(2, '0')} '
+        '${months[date.month - 1]} '
+        '${date.year}';
   }
 
   // ============================================================
-  // NAMA HARI
+  // FORMAT TIME
   // ============================================================
 
-  String getDay(String dateTime) {
-    if (dateTime.isEmpty) {
-      return '-';
-    }
-
-    final date = DateTime.tryParse(dateTime);
-
-    if (date == null) {
-      return '-';
-    }
-
-    const days = [
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
-    ];
-
-    return days[date.weekday - 1];
-  }
-
-  // ============================================================
-  // FORMAT JAM
-  // ============================================================
-
-  String formatTime(String dateTime) {
-    if (dateTime.isEmpty) {
+  String formatTime(dynamic dateTime) {
+    if (dateTime == null) {
       return '--:--';
     }
 
-    final date = DateTime.tryParse(dateTime);
+    final date = DateTime.tryParse(dateTime.toString());
 
     if (date == null) {
       return '--:--';
@@ -183,7 +574,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   // FORMAT STATUS
   // ============================================================
 
-  String formatStatus(String status) {
+  String formatStatus(String? status) {
+    if (status == null || status.isEmpty) {
+      return '-';
+    }
+
     if (status == 'masuk') {
       return 'Present';
     }
@@ -193,458 +588,5 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     }
 
     return status;
-  }
-
-  // ============================================================
-  // HEADER
-  // ============================================================
-
-  Widget buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAF0FF),
-              borderRadius: BorderRadius.circular(13),
-            ),
-            child: const Icon(
-              Icons.history_rounded,
-              color: Color(0xFF1557D6),
-              size: 25,
-            ),
-          ),
-          const SizedBox(width: 12),
-
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Attendance History',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF172033),
-                  ),
-                ),
-                SizedBox(height: 3),
-                Text(
-                  'Review your attendance records',
-                  style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
-                ),
-              ],
-            ),
-          ),
-
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.tune_rounded, color: Color(0xFF172033)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // SUMMARY
-  // ============================================================
-
-  Widget buildSummary() {
-    return Row(
-      children: [
-        Expanded(
-          child: buildSummaryCard(
-            title: 'Present',
-            value: '18',
-            icon: Icons.check_circle_outline,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: buildSummaryCard(
-            title: 'Absent',
-            value: '0',
-            icon: Icons.cancel_outlined,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: buildSummaryCard(
-            title: 'Rate',
-            value: '96%',
-            icon: Icons.percent_rounded,
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ============================================================
-  // SUMMARY CARD
-  // ============================================================
-
-  Widget buildSummaryCard({
-    required String title,
-    required String value,
-    required IconData icon,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(icon, size: 19, color: const Color(0xFF1557D6)),
-          const SizedBox(height: 7),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF172033),
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 9, color: Color(0xFF6B7280)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // MONTH FILTER
-  // ============================================================
-
-  Widget buildMonthFilter() {
-    return Row(
-      children: [
-        const Expanded(
-          child: Text(
-            'Attendance Records',
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF172033),
-            ),
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFE5E7EB)),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: selectedMonth,
-              underline: const SizedBox(),
-              icon: const Icon(Icons.keyboard_arrow_down),
-              items: const [
-                DropdownMenuItem<String>(
-                  value: 'Oktober 2026',
-                  child: Text('Okt 2026'),
-                ),
-              ],
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() {
-                    selectedMonth = value;
-                  });
-                }
-              },
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ============================================================
-  // HISTORY LIST
-  // ============================================================
-
-  Widget buildHistoryList() {
-    // Saat data sedang diambil dari API.
-    if (isLoading) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(40),
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    // Kalau API tidak mengembalikan data.
-    if (attendanceHistory.isEmpty) {
-      return buildEmptyState();
-    }
-
-    return Column(
-      children: attendanceHistory.map((attendance) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: buildAttendanceItem(attendance),
-        );
-      }).toList(),
-    );
-  }
-
-  // ============================================================
-  // ATTENDANCE ITEM
-  // ============================================================
-
-  Widget buildAttendanceItem(Map<String, String> attendance) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(17),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // DATE + STATUS
-          Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE8F8EE),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.check_rounded,
-                  color: Color(0xFF16A34A),
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 11),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      attendance['day'] ?? '-',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF172033),
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      attendance['date'] ?? '-',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF6B7280),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              buildStatusBadge(attendance['status'] ?? '-'),
-            ],
-          ),
-
-          const SizedBox(height: 15),
-
-          const Divider(height: 1, color: Color(0xFFE5E7EB)),
-
-          const SizedBox(height: 14),
-
-          // CHECK IN / CHECK OUT
-          Row(
-            children: [
-              Expanded(
-                child: buildTimeDetail(
-                  icon: Icons.login_rounded,
-                  title: 'Check-in',
-                  value: attendance['checkIn'] ?? '--:--',
-                ),
-              ),
-              Container(width: 1, height: 42, color: const Color(0xFFE5E7EB)),
-              Expanded(
-                child: buildTimeDetail(
-                  icon: Icons.logout_rounded,
-                  title: 'Check-out',
-                  value: attendance['checkOut'] ?? '--:--',
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 14),
-
-          // LOCATION
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF6F8FC),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.location_on_outlined,
-                  size: 17,
-                  color: Color(0xFF1557D6),
-                ),
-                const SizedBox(width: 7),
-                const Text(
-                  'Location',
-                  style: TextStyle(fontSize: 10, color: Color(0xFF6B7280)),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    attendance['location'] ?? '-',
-                    textAlign: TextAlign.right,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF172033),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // TIME DETAIL
-  // ============================================================
-
-  Widget buildTimeDetail({
-    required IconData icon,
-    required String title,
-    required String value,
-  }) {
-    return Row(
-      children: [
-        const SizedBox(width: 4),
-        Icon(icon, size: 18, color: const Color(0xFF1557D6)),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(fontSize: 10, color: Color(0xFF6B7280)),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF172033),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  // ============================================================
-  // STATUS BADGE
-  // ============================================================
-
-  Widget buildStatusBadge(String status) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8F8EE),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: const BoxDecoration(
-              color: Color(0xFF16A34A),
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 5),
-          Text(
-            status,
-            style: const TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF15803D),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // EMPTY STATE
-  // ============================================================
-
-  Widget buildEmptyState() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 50),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(17),
-      ),
-      child: const Column(
-        children: [
-          Icon(Icons.event_busy_outlined, size: 48, color: Color(0xFF9CA3AF)),
-          SizedBox(height: 14),
-          Text(
-            'No attendance records',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF172033),
-            ),
-          ),
-          SizedBox(height: 5),
-          Text(
-            'Your attendance history will appear here.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
-          ),
-        ],
-      ),
-    );
   }
 }

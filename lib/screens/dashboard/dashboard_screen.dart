@@ -1,8 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:timy_attend/controllers/check_in_user.dart';
 import 'package:timy_attend/controllers/check_out_user.dart';
 import 'package:timy_attend/controllers/history_absen.dart';
+import 'package:timy_attend/core/theme/app_theme.dart';
+import 'package:timy_attend/core/theme/theme_provider.dart';
 import 'package:timy_attend/models/absen/check_in_request_model.dart';
 import 'package:timy_attend/models/absen/check_out_request_model.dart';
 import 'package:timy_attend/screens/history/history_screen.dart';
@@ -10,8 +16,6 @@ import 'package:timy_attend/screens/maps/maps_widget.dart';
 import 'package:timy_attend/services/maps_services.dart';
 
 import '../profile/profile_screen.dart';
-
-import 'package:geolocator/geolocator.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -28,6 +32,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   String? checkInTime;
   String? checkOutTime;
+
+  // Jam digital yang berjalan setiap detik (hanya me-rebuild widget jam).
+  late final Stream<DateTime> _clock = Stream<DateTime>.periodic(
+    const Duration(seconds: 1),
+    (_) => DateTime.now(),
+  );
 
   Future<void> checkIn() async {
     // 1. Loading AKTIF sebelum mengambil position/koordinat
@@ -56,59 +66,64 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FB),
+    final c = context.colors;
+    final isDark = context.isDark;
 
-      // =========================
-      // BODY
-      // =========================
-      body: SafeArea(
-        child: IndexedStack(
-          index: selectedIndex,
-          children: [buildHomePage(), buildHistoryPage(), buildProfilePage()],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: (isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark)
+          .copyWith(
+            statusBarColor: Colors.transparent,
+            systemNavigationBarColor: c.surface,
+            systemNavigationBarIconBrightness: isDark
+                ? Brightness.light
+                : Brightness.dark,
+          ),
+      child: Scaffold(
+        backgroundColor: c.bg,
+
+        // =========================
+        // BODY
+        // =========================
+        body: SafeArea(
+          child: IndexedStack(
+            index: selectedIndex,
+            children: [buildHomePage(), buildHistoryPage(), buildProfilePage()],
+          ),
         ),
-      ),
 
-      // =========================
-      // BOTTOM NAVIGATION
-      // =========================
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFE8EDF5))),
-        ),
-        child: NavigationBar(
-          selectedIndex: selectedIndex,
-
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.transparent,
-          elevation: 0,
-          height: 68,
-          indicatorColor: const Color(0xFFEAF1FF),
-
-          onDestinationSelected: (int index) {
-            setState(() {
-              selectedIndex = index;
-            });
-          },
-
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.home_outlined, color: Color(0xFF6B7280)),
-              selectedIcon: Icon(Icons.home, color: Color(0xFF1557D6)),
-              label: 'Home',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.history_outlined, color: Color(0xFF6B7280)),
-              selectedIcon: Icon(Icons.history, color: Color(0xFF1557D6)),
-              label: 'History',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline, color: Color(0xFF6B7280)),
-              selectedIcon: Icon(Icons.person, color: Color(0xFF1557D6)),
-              label: 'Profile',
-            ),
-          ],
+        // =========================
+        // BOTTOM NAVIGATION
+        // =========================
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            color: c.surface,
+            border: Border(top: BorderSide(color: c.border)),
+          ),
+          child: NavigationBar(
+            selectedIndex: selectedIndex,
+            onDestinationSelected: (int index) {
+              setState(() {
+                selectedIndex = index;
+              });
+            },
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.home_outlined),
+                selectedIcon: Icon(Icons.home_rounded),
+                label: 'Home',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.history_outlined),
+                selectedIcon: Icon(Icons.history_rounded),
+                label: 'History',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.person_outline_rounded),
+                selectedIcon: Icon(Icons.person_rounded),
+                label: 'Profile',
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -120,12 +135,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Widget buildHomePage() {
     return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           buildHeader(),
-          const SizedBox(height: 28),
+          const SizedBox(height: 26),
           buildGreeting(),
           const SizedBox(height: 22),
           buildAttendanceCard(),
@@ -134,9 +150,85 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           const SizedBox(height: 28),
           buildMonthlyAttendance(),
           const SizedBox(height: 28),
-
           buildRecentRecords(),
         ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // SMALL HELPERS
+  // ============================================================
+
+  Widget _buildSectionTitle(String title, {Widget? trailing}) {
+    final c = context.colors;
+
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.2,
+              color: c.text,
+            ),
+          ),
+        ),
+        if (trailing != null) trailing,
+      ],
+    );
+  }
+
+  Widget _buildIconButton({
+    required Widget child,
+    required VoidCallback onPressed,
+    bool showDot = false,
+  }) {
+    final c = context.colors;
+
+    return Material(
+      color: c.surface,
+      shape: CircleBorder(side: BorderSide(color: c.border)),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onPressed,
+        child: SizedBox(
+          width: 42,
+          height: 42,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              child,
+              if (showDot)
+                Positioned(
+                  top: 10,
+                  right: 11,
+                  child: Container(
+                    width: 9,
+                    height: 9,
+                    decoration: BoxDecoration(
+                      color: c.danger,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: c.surface, width: 1.5),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDecorCircle(double size, double opacity) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white.withValues(alpha: opacity),
       ),
     );
   }
@@ -146,6 +238,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   // ============================================================
 
   Widget buildHeader() {
+    final c = context.colors;
+    final isDark = context.isDark;
+
     return Row(
       children: [
         // Logo kecil aplikasi.
@@ -156,14 +251,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFF2F6BEA), Color(0xFF1557D6)],
+              colors: [Color(0xFF3B7BF2), Color(0xFF1557D6)],
             ),
             borderRadius: BorderRadius.circular(15),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF1557D6).withValues(alpha: 0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 5),
+                color: const Color(0xFF1557D6).withValues(alpha: 0.35),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
               ),
             ],
           ),
@@ -177,7 +272,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         const SizedBox(width: 12),
 
         // Nama aplikasi.
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -187,30 +282,51 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.3,
-                  color: Color(0xFF172033),
+                  color: c.text,
                 ),
               ),
               Text(
                 'Attendance Portal',
-                style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+                style: TextStyle(fontSize: 11, color: c.textMuted),
               ),
             ],
           ),
         ),
 
-        // Tombol notifikasi.
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-            border: Border.all(color: const Color(0xFFE8EDF5)),
-          ),
-          child: IconButton(
-            onPressed: () {},
-            icon: const Icon(
-              Icons.notifications_none_rounded,
-              color: Color(0xFF172033),
+        // Tombol ganti tema (light / dark).
+        _buildIconButton(
+          onPressed: () {
+            ref
+                .read(themeModeProvider.notifier)
+                .toggle(Theme.of(context).brightness);
+          },
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 280),
+            transitionBuilder: (child, animation) {
+              return RotationTransition(
+                turns: Tween<double>(begin: 0.75, end: 1.0).animate(animation),
+                child: FadeTransition(opacity: animation, child: child),
+              );
+            },
+            child: Icon(
+              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+              key: ValueKey<bool>(isDark),
+              color: c.text,
+              size: 21,
             ),
+          ),
+        ),
+
+        const SizedBox(width: 8),
+
+        // Tombol notifikasi.
+        _buildIconButton(
+          onPressed: () {},
+          showDot: true,
+          child: Icon(
+            Icons.notifications_none_rounded,
+            color: c.text,
+            size: 22,
           ),
         ),
 
@@ -225,10 +341,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               colors: [Color(0xFF60A5FA), Color(0xFF1557D6)],
             ),
           ),
-          child: const CircleAvatar(
+          child: CircleAvatar(
             radius: 19,
-            backgroundColor: Color(0xFFEAF0FF),
-            child: Icon(Icons.person, color: Color(0xFF1557D6)),
+            backgroundColor: c.primarySoft,
+            child: Icon(Icons.person_rounded, color: c.primary),
           ),
         ),
       ],
@@ -240,34 +356,45 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   // ============================================================
 
   Widget buildGreeting() {
+    final c = context.colors;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Good morning, $userName 👋',
-          style: const TextStyle(
+          '${getGreeting()}, $userName 👋',
+          style: TextStyle(
             fontSize: 26,
             fontWeight: FontWeight.w800,
             letterSpacing: -0.6,
-            color: Color(0xFF172033),
+            color: c.text,
           ),
         ),
 
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
 
-        Row(
-          children: [
-            const Icon(
-              Icons.calendar_today_outlined,
-              size: 13,
-              color: Color(0xFF6B7280),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              getCurrentDate(),
-              style: const TextStyle(fontSize: 13.5, color: Color(0xFF6B7280)),
-            ),
-          ],
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: c.border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.calendar_today_rounded, size: 13, color: c.primary),
+              const SizedBox(width: 6),
+              Text(
+                getCurrentDate(),
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                  color: c.textMuted,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -278,89 +405,164 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   // ============================================================
 
   Widget buildAttendanceCard() {
+    final c = context.colors;
+    final isDark = context.isDark;
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF2F6BEA), Color(0xFF1245B0)],
+          colors: [c.heroStart, c.heroEnd],
         ),
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1557D6).withValues(alpha: 0.35),
+            color: c.heroEnd.withValues(alpha: isDark ? 0.55 : 0.35),
             blurRadius: 28,
             offset: const Offset(0, 14),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header card.
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  "Today's Attendance",
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.2,
-                    color: Colors.white,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: Stack(
+          children: [
+            // Dekorasi lingkaran.
+            Positioned(top: -40, right: -30, child: _buildDecorCircle(150, 0.08)),
+            Positioned(
+              bottom: -60,
+              left: -40,
+              child: _buildDecorCircle(170, 0.06),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header card.
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          "Today's Attendance",
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: -0.1,
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ),
+
+                      buildStatusBadge(),
+                    ],
                   ),
-                ),
+
+                  const SizedBox(height: 10),
+
+                  // Jam digital.
+                  buildLiveClock(),
+
+                  const SizedBox(height: 20),
+
+                  // Check-in dan check-out.
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.18),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: buildTimeItem(
+                            title: 'Check-in',
+                            time: isCheckedIn
+                                ? (checkInTime ?? '--:--')
+                                : '--:--',
+                            icon: Icons.login_rounded,
+                          ),
+                        ),
+
+                        Container(
+                          width: 1,
+                          height: 58,
+                          color: Colors.white.withValues(alpha: 0.25),
+                        ),
+
+                        Expanded(
+                          child: buildTimeItem(
+                            title: 'Check-out',
+                            time: isCheckedOut
+                                ? (checkOutTime ?? '--:--')
+                                : '--:--',
+                            icon: Icons.logout_rounded,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  // Tombol utama.
+                  buildAttendanceButton(),
+                ],
               ),
-
-              buildStatusBadge(),
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // Check-in dan check-out.
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: buildTimeItem(
-                    title: 'Check-in',
-                    time: isCheckedIn ? (checkInTime ?? '--:--') : '--:--',
-                    icon: Icons.login_rounded,
-                  ),
-                ),
-
-                Container(
-                  width: 1,
-                  height: 58,
-                  color: Colors.white.withValues(alpha: 0.25),
-                ),
-
-                Expanded(
-                  child: buildTimeItem(
-                    title: 'Check-out',
-                    time: isCheckedOut ? (checkOutTime ?? '--:--') : '--:--',
-                    icon: Icons.logout_rounded,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 18),
-
-          // Tombol utama.
-          buildAttendanceButton(),
-        ],
+          ],
+        ),
       ),
+    );
+  }
+
+  // ============================================================
+  // LIVE CLOCK
+  // ============================================================
+
+  Widget buildLiveClock() {
+    String two(int v) => v.toString().padLeft(2, '0');
+
+    return StreamBuilder<DateTime>(
+      stream: _clock,
+      initialData: DateTime.now(),
+      builder: (context, snapshot) {
+        final t = snapshot.data ?? DateTime.now();
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text(
+              '${two(t.hour)}:${two(t.minute)}',
+              style: const TextStyle(
+                fontSize: 46,
+                height: 1,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -1.5,
+                color: Colors.white,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              two(t.second),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.white.withValues(alpha: 0.6),
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -540,6 +742,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       );
     });
 
+    // Hero card selalu berwarna biru gelap (light & dark),
+    // jadi tombolnya memakai warna tetap.
     return SizedBox(
       width: double.infinity,
       height: 54,
@@ -634,16 +838,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   // ============================================================
 
   Widget buildLocationCard() {
+    final c = context.colors;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: c.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE8EDF5)),
+        border: Border.all(color: c.border),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1557D6).withValues(alpha: 0.06),
+            color: c.primary.withValues(alpha: 0.06),
             blurRadius: 24,
             offset: const Offset(0, 10),
           ),
@@ -652,42 +858,26 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Current Location',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.2,
-                    color: Color(0xFF172033),
-                  ),
+          _buildSectionTitle(
+            'Current Location',
+            trailing: TextButton.icon(
+              onPressed: () {},
+              style: TextButton.styleFrom(
+                foregroundColor: c.primary,
+                backgroundColor: c.primarySoft,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                minimumSize: const Size(0, 34),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
                 ),
               ),
-
-              TextButton.icon(
-                onPressed: () {},
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF1557D6),
-                  backgroundColor: const Color(0xFFEAF1FF),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  minimumSize: const Size(0, 34),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-                icon: const Icon(Icons.refresh, size: 16),
-                label: const Text(
-                  'Refresh',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                ),
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text(
+                'Refresh',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
-            ],
+            ),
           ),
 
           const SizedBox(height: 14),
@@ -700,11 +890,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             child: Container(
               height: 170,
               width: double.infinity,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [Color(0xFFEFF4FC), Color(0xFFDDE8F7)],
+                  colors: [c.primarySoft, c.surfaceAlt],
                 ),
               ),
               child: Stack(
@@ -714,7 +904,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   // untuk memberikan kesan map.
                   CustomPaint(
                     size: const Size(double.infinity, double.infinity),
-                    painter: MapPlaceholderPainter(),
+                    painter: MapPlaceholderPainter(lineColor: c.border),
                   ),
 
                   // Marker lokasi.
@@ -722,12 +912,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     width: 50,
                     height: 50,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1557D6),
+                      color: c.primary,
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 3),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF1557D6).withValues(alpha: 0.3),
+                          color: c.primary.withValues(alpha: 0.3),
                           blurRadius: 14,
                           spreadRadius: 6,
                         ),
@@ -749,7 +939,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         vertical: 7,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: c.surface,
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
@@ -759,12 +949,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           ),
                         ],
                       ),
-                      child: const Text(
+                      child: Text(
                         'Your current location',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF172033),
+                          color: c.text,
                         ),
                       ),
                     ),
@@ -782,13 +972,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEAF1FF),
+                  color: c.primarySoft,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.location_on_outlined,
                   size: 16,
-                  color: Color(0xFF1557D6),
+                  color: c.primary,
                 ),
               ),
 
@@ -797,10 +987,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               Expanded(
                 child: Text(
                   'Lat:    •   Long: ',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF6B7280),
+                    color: c.textMuted,
                   ),
                 ),
               ),
@@ -816,39 +1006,28 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   // ============================================================
 
   Widget buildMonthlyAttendance() {
+    final c = context.colors;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            const Expanded(
-              child: Text(
-                'Monthly Attendance',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.2,
-                  color: Color(0xFF172033),
-                ),
+        _buildSectionTitle(
+          'Monthly Attendance',
+          trailing: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            decoration: BoxDecoration(
+              color: c.primarySoft,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              getCurrentMonth(),
+              style: TextStyle(
+                fontSize: 12,
+                color: c.primary,
+                fontWeight: FontWeight.w700,
               ),
             ),
-
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEAF1FF),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                getCurrentMonth(),
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF1557D6),
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
 
         const SizedBox(height: 14),
@@ -860,7 +1039,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 title: 'Attendance',
                 value: '96%',
                 subtitle: 'Attendance rate',
-                icon: Icons.percent,
+                icon: Icons.percent_rounded,
+                color: c.primary,
+                softColor: c.primarySoft,
               ),
             ),
 
@@ -871,7 +1052,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 title: 'Present',
                 value: '18',
                 subtitle: 'Days',
-                icon: Icons.check_circle_outline,
+                icon: Icons.check_circle_outline_rounded,
+                color: c.success,
+                softColor: c.successSoft,
               ),
             ),
 
@@ -883,6 +1066,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 value: '0',
                 subtitle: 'Days',
                 icon: Icons.event_busy_outlined,
+                color: c.danger,
+                softColor: c.dangerSoft,
               ),
             ),
           ],
@@ -900,16 +1085,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     required String value,
     required String subtitle,
     required IconData icon,
+    required Color color,
+    required Color softColor,
   }) {
+    final c = context.colors;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE8EDF5)),
+        color: c.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: c.border),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1557D6).withValues(alpha: 0.05),
+            color: color.withValues(alpha: 0.07),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -918,22 +1107,22 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(9),
             decoration: BoxDecoration(
-              color: const Color(0xFFEAF1FF),
-              borderRadius: BorderRadius.circular(12),
+              color: softColor,
+              borderRadius: BorderRadius.circular(13),
             ),
-            child: Icon(icon, size: 18, color: const Color(0xFF1557D6)),
+            child: Icon(icon, size: 18, color: color),
           ),
 
           const SizedBox(height: 10),
 
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w500,
-              color: Color(0xFF6B7280),
+              color: c.textMuted,
             ),
           ),
 
@@ -941,18 +1130,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.5,
-              color: Color(0xFF172033),
+              color: c.text,
             ),
           ),
 
           Text(
             subtitle,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 10, color: Color(0xFF9CA3AF)),
+            style: TextStyle(fontSize: 10, color: c.textFaint),
           ),
         ],
       ),
@@ -964,6 +1153,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   // ============================================================
 
   Widget buildRecentRecords() {
+    final c = context.colors;
+
     final List<Map<String, String>> records = [
       {
         'day': 'Today',
@@ -988,35 +1179,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            const Expanded(
-              child: Text(
-                'Recent Records',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.2,
-                  color: Color(0xFF172033),
-                ),
-              ),
+        _buildSectionTitle(
+          'Recent Records',
+          trailing: TextButton(
+            onPressed: () {
+              setState(() {
+                selectedIndex = 1;
+              });
+            },
+            style: TextButton.styleFrom(foregroundColor: c.primary),
+            child: const Text(
+              'View All',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
             ),
-
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  selectedIndex = 1;
-                });
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF1557D6),
-              ),
-              child: const Text(
-                'View All',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-              ),
-            ),
-          ],
+          ),
         ),
 
         const SizedBox(height: 6),
@@ -1035,24 +1211,26 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   // ============================================================
 
   Widget buildRecordItem(Map<String, String> record) {
+    final c = context.colors;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE8EDF5)),
+        color: c.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: c.border),
       ),
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
-              color: const Color(0xFFE8F8EE),
-              borderRadius: BorderRadius.circular(13),
+              color: c.successSoft,
+              borderRadius: BorderRadius.circular(14),
             ),
-            child: const Icon(Icons.check, size: 20, color: Color(0xFF16A34A)),
+            child: Icon(Icons.check_rounded, size: 22, color: c.success),
           ),
 
           const SizedBox(width: 12),
@@ -1063,21 +1241,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               children: [
                 Text(
                   '${record['day']}, ${record['date']}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF172033),
+                    color: c.text,
                   ),
                 ),
 
                 const SizedBox(height: 3),
 
-                Text(
-                  record['time']!,
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    color: Color(0xFF6B7280),
-                  ),
+                Row(
+                  children: [
+                    Icon(Icons.schedule_rounded, size: 12, color: c.textFaint),
+                    const SizedBox(width: 4),
+                    Text(
+                      record['time']!,
+                      style: TextStyle(fontSize: 11.5, color: c.textMuted),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -1086,15 +1267,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFFE8F8EE),
+              color: c.successSoft,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
               record['status']!,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 10.5,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF15803D),
+                color: c.success,
               ),
             ),
           ),
@@ -1116,6 +1297,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Widget buildProfilePage() {
     return const ProfileScreen();
+  }
+
+  // ============================================================
+  // GREETING TEXT
+  // ============================================================
+
+  String getGreeting() {
+    final int hour = DateTime.now().hour;
+
+    if (hour < 11) return 'Good morning';
+    if (hour < 15) return 'Good afternoon';
+    if (hour < 19) return 'Good evening';
+    return 'Good night';
   }
 
   // ============================================================
@@ -1191,10 +1385,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 // menggunakan latitude dan longitude sebenarnya.
 
 class MapPlaceholderPainter extends CustomPainter {
+  const MapPlaceholderPainter({required this.lineColor});
+
+  final Color lineColor;
+
   @override
   void paint(Canvas canvas, Size size) {
     final Paint paint = Paint()
-      ..color = const Color(0xFFCBD8EA)
+      ..color = lineColor
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 
@@ -1210,7 +1408,7 @@ class MapPlaceholderPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return false;
+  bool shouldRepaint(covariant MapPlaceholderPainter oldDelegate) {
+    return oldDelegate.lineColor != lineColor;
   }
 }
