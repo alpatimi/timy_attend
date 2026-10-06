@@ -100,7 +100,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     // LOGO
                     // =========================
                     Image.asset(
-                      'assets/images/timy_attend_logo.png',
+                      'assets/images/timy_attend_logo.jpg',
                       width: 200,
                       fit: BoxFit.contain,
                     ),
