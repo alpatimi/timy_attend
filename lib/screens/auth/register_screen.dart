@@ -145,7 +145,7 @@ class _RegistrasiScreenState extends ConsumerState<RegistrasiScreen> {
                     // =========================
                     Center(
                       child: Image.asset(
-                        'assets/images/timy_attend_logo.png',
+                        'assets/images/timy_attend_logo.jpg',
                         width: 170,
                         fit: BoxFit.contain,
                       ),

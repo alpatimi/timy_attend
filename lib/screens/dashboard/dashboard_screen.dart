@@ -39,6 +39,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     (_) => DateTime.now(),
   );
 
+
+  
   Future<void> checkIn() async {
     // 1. Loading AKTIF sebelum mengambil position/koordinat
     try {
